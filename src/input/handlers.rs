@@ -5,7 +5,6 @@ use std::io;
 
 use crate::app::{App, AppMode, SidebarItem};
 use crate::config::{Keybinds, KeyBind, save_config, get_available_themes};
-use crate::models::Message;
 use super::file_picker;
 
 pub fn handle_keybind_recording(app: &mut App, key: KeyEvent, action: &str) -> Result<bool> {
@@ -83,7 +82,6 @@ pub fn handle_input_mode(app: &mut App, key: KeyEvent, kb: &Keybinds) {
         app.mode = AppMode::Messages;
         app.attached_files.clear();
     } else if kb.send_message.matches(key.code, key.modifiers) {
-        send_message(app);
         app.mode = AppMode::Messages;
     } else if let KeyCode::Char(c) = key.code {
         if !key.modifiers.contains(KeyModifiers::CONTROL) {
@@ -152,6 +150,10 @@ fn select_sidebar_item(app: &mut App) {
             SidebarItem::Server(guild) => {
                 if let Some(g) = app.guilds.iter_mut().find(|g| g.id == guild.id) {
                     g.toggle_expanded();
+                    
+                    if g.expanded && !app.channel_cache.contains_key(&g.id) {
+                        app.loading_channels = true;
+                    }
                 }
             }
             SidebarItem::Channel(channel) => {
@@ -162,6 +164,7 @@ fn select_sidebar_item(app: &mut App) {
                     app.messages = messages.clone();
                 } else {
                     app.messages.clear();
+                    app.loading_messages = true;
                 }
                 
                 app.mode = AppMode::Messages;
@@ -191,43 +194,6 @@ fn scroll_messages_up(app: &mut App) {
     if app.message_scroll > 0 {
         app.message_scroll = app.message_scroll.saturating_sub(speed);
     }
-}
-
-fn send_message(app: &mut App) {
-    if app.input.is_empty() && app.attached_files.is_empty() {
-        return;
-    }
-
-    if let Some(channel_id) = &app.selected_channel {
-        let mut content = app.input.clone();
-        
-        if !app.attached_files.is_empty() {
-            if !content.is_empty() {
-                content.push('\n');
-            }
-            for file in &app.attached_files {
-                content.push_str(&format!("[Attached: {}]", file.name));
-            }
-        }
-        
-        let new_msg = Message::new(
-            format!("m{}", chrono::Utc::now().timestamp()),
-            channel_id.clone(),
-            app.config.general.username.clone(),
-            content,
-            chrono::Local::now().format("%H:%M:%S").to_string(),
-        );
-        
-        app.messages.push(new_msg.clone());
-        app.message_cache
-            .entry(channel_id.clone())
-            .or_insert_with(Vec::new)
-            .push(new_msg);
-    }
-
-    app.input.clear();
-    app.input_cursor = 0;
-    app.attached_files.clear();
 }
 
 fn edit_setting(app: &mut App) -> Result<()> {

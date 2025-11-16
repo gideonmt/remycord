@@ -7,7 +7,10 @@ pub use sidebar::SidebarItem;
 
 use crate::config::{Config, Theme, load_theme};
 use crate::models::{Guild, Channel, Message, AttachedFile};
+use crate::discord::DiscordClient;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct App {
     pub mode: AppMode,
@@ -24,11 +27,14 @@ pub struct App {
     pub config: Config,
     pub typing_users: Vec<String>,
     pub settings_selected: usize,
+    pub discord_client: Option<Arc<Mutex<DiscordClient>>>,
+    pub loading_channels: bool,
+    pub loading_messages: bool,
 }
 
 impl App {
     pub fn new(config: Config) -> Self {
-        let mut app = Self {
+        Self {
             mode: AppMode::Sidebar,
             guilds: Vec::new(),
             selected_sidebar_idx: 0,
@@ -43,9 +49,10 @@ impl App {
             config,
             typing_users: Vec::new(),
             settings_selected: 0,
-        };
-        
-        app
+            discord_client: None,
+            loading_channels: false,
+            loading_messages: false,
+        }
     }
 
     pub fn theme(&self) -> &Theme {
@@ -67,5 +74,9 @@ impl App {
 
     pub fn get_current_guild_name(&self) -> Option<String> {
         state::get_guild_name(&self.selected_channel, &self.guilds, &self.channel_cache)
+    }
+    
+    pub fn set_discord_client(&mut self, client: DiscordClient) {
+        self.discord_client = Some(Arc::new(Mutex::new(client)));
     }
 }

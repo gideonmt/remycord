@@ -13,10 +13,13 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use app::App;
 use config::load_config;
 use input::handle_input;
+use discord::{DiscordClient, DiscordEvent};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -25,17 +28,10 @@ async fn main() -> Result<()> {
         config::Config::default()
     });
 
-    match discord::token::get_token() {
+    let token = match discord::token::get_token() {
         Ok(token) => {
             println!("Found Discord token, connecting...");
-            match discord::client::connect_and_verify(&token).await {
-                Ok(username) => {
-                    println!("Successfully logged in as: {}", username);
-                }
-                Err(e) => {
-                    eprintln!("Failed to connect to Discord: {}", e);
-                }
-            }
+            token
         }
         Err(e) => {
             eprintln!("No Discord token found: {}", e);
@@ -49,8 +45,13 @@ async fn main() -> Result<()> {
                 eprintln!("  secret-tool store --label=\"Discord Token\" service remycord username token");
             }
             eprintln!("");
+            return Ok(());
         }
-    }
+    };
+
+    let (discord_client, mut event_rx) = DiscordClient::new(token.clone()).await?;
+    
+    discord_client.start_gateway(token.clone()).await?;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -59,7 +60,19 @@ async fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     let mut app = App::new(config);
-    let res = run_app(&mut terminal, &mut app);
+    app.set_discord_client(discord_client);
+    
+    let app = Arc::new(Mutex::new(app));
+    let app_clone = app.clone();
+    
+    tokio::spawn(async move {
+        while let Some(event) = event_rx.recv().await {
+            let mut app = app_clone.lock().await;
+            handle_discord_event(&mut app, event).await;
+        }
+    });
+
+    let res = run_app(&mut terminal, app).await;
 
     disable_raw_mode()?;
     execute!(
@@ -76,16 +89,124 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn run_app(
+async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
+    match event {
+        DiscordEvent::Ready(guilds) => {
+            for guild in guilds {
+                if !app.guilds.iter().any(|g| g.id == guild.id) {
+                    app.guilds.push(guild);
+                } else {
+                    if let Some(g) = app.guilds.iter_mut().find(|g| g.id == guild.id) {
+                        g.name = guild.name;
+                    }
+                }
+            }
+        }
+        DiscordEvent::GuildChannels(guild_id, channels) => {
+            app.channel_cache.insert(guild_id, channels);
+            app.loading_channels = false;
+        }
+        DiscordEvent::Messages(channel_id, messages) => {
+            app.messages = messages.clone();
+            app.message_cache.insert(channel_id, messages);
+            app.loading_messages = false;
+        }
+        DiscordEvent::NewMessage(message) => {
+            if Some(&message.channel_id) == app.selected_channel.as_ref() {
+                app.messages.push(message.clone());
+            }
+            
+            app.message_cache
+                .entry(message.channel_id.clone())
+                .or_insert_with(Vec::new)
+                .push(message);
+        }
+        DiscordEvent::Error(err) => {
+            eprintln!("Discord error: {}", err);
+        }
+    }
+}
+
+async fn run_app(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    app: &mut App,
+    app: Arc<Mutex<App>>,
 ) -> Result<()> {
     loop {
-        terminal.draw(|f| ui::draw(f, app))?;
+        {
+            let mut app = app.lock().await;
+            
+            if app.loading_channels {
+                if let Some(guild) = app.guilds.iter().find(|g| g.expanded && !app.channel_cache.contains_key(&g.id)) {
+                    let guild_id = guild.id.clone();
+                    let client_arc = app.discord_client.clone();
+                    if let Some(client_arc) = client_arc {
+                        let client = client_arc.lock().await;
+                        if let Ok(channels) = client.fetch_channels(&guild_id).await {
+                            drop(client);
+                            app.channel_cache.insert(guild_id, channels);
+                        }
+                    }
+                    app.loading_channels = false;
+                }
+            }
+            
+            if app.loading_messages {
+                if let Some(channel_id) = &app.selected_channel.clone() {
+                    if !app.message_cache.contains_key(channel_id) {
+                        let client_arc = app.discord_client.clone();
+                        if let Some(client_arc) = client_arc {
+                            let client = client_arc.lock().await;
+                            if let Ok(messages) = client.fetch_messages(channel_id, 50).await {
+                                drop(client);
+                                app.messages = messages.clone();
+                                app.message_cache.insert(channel_id.clone(), messages);
+                            }
+                        }
+                    }
+                    app.loading_messages = false;
+                }
+            }
+            
+            terminal.draw(|f| ui::draw(f, &app))?;
+        }
 
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                if handle_input(app, key, terminal)? {
+                let mut app_lock = app.lock().await;
+                
+                let should_send = if app_lock.mode == app::AppMode::Input 
+                    && app_lock.config.keybinds.send_message.matches(key.code, key.modifiers) {
+                    true
+                } else {
+                    false
+                };
+                
+                if should_send {
+                    let channel_id = app_lock.selected_channel.clone();
+                    let content = app_lock.input.clone();
+                    
+                    if !content.is_empty() {
+                        if let Some(channel_id) = channel_id {
+                            let client_arc = app_lock.discord_client.clone();
+                            if let Some(client_arc) = client_arc {
+                                let client = client_arc.lock().await;
+                                if let Ok(message) = client.send_message(&channel_id, &content).await {
+                                    drop(client);
+                                    app_lock.messages.push(message.clone());
+                                    app_lock.message_cache
+                                        .entry(channel_id)
+                                        .or_insert_with(Vec::new)
+                                        .push(message);
+                                }
+                            }
+                        }
+                        
+                        app_lock.input.clear();
+                        app_lock.input_cursor = 0;
+                    }
+                }
+                
+                if handle_input(&mut app_lock, key, terminal)? {
                     return Ok(());
                 }
             }
