@@ -15,22 +15,39 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .enumerate()
         .map(|(i, item)| {
             let text = match item {
+                SidebarItem::DmSection => {
+                    let arrow = if app.dm_section_expanded { "▼ " } else { "▶ " };
+                    format!("{}Direct Messages", arrow)
+                }
+                SidebarItem::DmChannel(dm) => {
+                    format!("  💬 {}", dm.display_name())
+                }
+                SidebarItem::ServerSection => {
+                    "▼ Servers".to_string()
+                }
                 SidebarItem::Server(guild) => {
                     let arrow = if guild.expanded { "▼ " } else { "▶ " };
-                    format!("{}{}", arrow, guild.name)
+                    format!("  {}{}", arrow, guild.name)
                 }
                 SidebarItem::Channel(channel) => {
-                    format!("  {}{}", channel.prefix(), channel.name)
+                    format!("    {}{}", channel.prefix(), channel.name)
                 }
             };
 
             let is_selected = i == app.selected_sidebar_idx;
             let is_active = match item {
+                SidebarItem::DmChannel(dm) => Some(dm.id.clone()) == app.selected_channel,
                 SidebarItem::Channel(channel) => Some(channel.id.clone()) == app.selected_channel,
                 _ => false,
             };
 
-            let style = if is_selected && app.mode == AppMode::Sidebar {
+            let is_section = matches!(item, SidebarItem::DmSection | SidebarItem::ServerSection);
+
+            let style = if is_section {
+                Style::default()
+                    .fg(theme.get_color("base0D"))
+                    .add_modifier(Modifier::BOLD)
+            } else if is_selected && app.mode == AppMode::Sidebar {
                 Style::default()
                     .fg(theme.get_color("base0A"))
                     .add_modifier(Modifier::BOLD)
@@ -53,7 +70,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
     let list = List::new(list_items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Servers & Channels")
+            .title("Navigation")
             .border_style(border_style),
     );
 

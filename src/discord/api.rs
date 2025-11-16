@@ -4,11 +4,20 @@ use serenity::model::prelude::*;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::models::{Guild as AppGuild, Channel as AppChannel, ChannelType, Message as AppMessage};
+use crate::models::{
+    Guild as AppGuild, 
+    Channel as AppChannel, 
+    ChannelType, 
+    Message as AppMessage,
+    DmChannel as AppDmChannel,
+    DmUser,
+};
 
 #[derive(Debug, Clone)]
 pub enum DiscordEvent {
     Ready(Vec<AppGuild>),
+    Connected(String),
+    DmChannels(Vec<AppDmChannel>),
     GuildChannels(String, Vec<AppChannel>),
     Messages(String, Vec<AppMessage>),
     NewMessage(AppMessage),
@@ -37,6 +46,7 @@ impl DiscordClient {
     pub async fn start_gateway(&self, token: String) -> Result<()> {
         let intents = GatewayIntents::GUILDS 
             | GatewayIntents::GUILD_MESSAGES 
+            | GatewayIntents::DIRECT_MESSAGES
             | GatewayIntents::MESSAGE_CONTENT;
         
         let event_tx = self.event_tx.clone();
@@ -59,6 +69,34 @@ impl DiscordClient {
         let guilds = self.http.get_guilds(None, None).await?;
         
         Ok(guilds.into_iter().map(|g| AppGuild::new(g.id.to_string(), g.name)).collect())
+    }
+    
+    pub async fn fetch_dms(&self) -> Result<Vec<AppDmChannel>> {
+        let channels = self.http.get_user_dm_channels().await?;
+        
+        let dm_channels: Vec<AppDmChannel> = channels
+            .into_iter()
+            .filter_map(|c| {
+                if let Some(recipient) = c.recipients.first() {
+                    let discriminator = recipient.discriminator
+                        .map(|d| d.to_string())
+                        .unwrap_or_else(|| "0".to_string());
+                    
+                    Some(AppDmChannel::new(
+                        c.id.to_string(),
+                        DmUser::new(
+                            recipient.id.to_string(),
+                            recipient.name.clone(),
+                            discriminator,
+                        ),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
+        Ok(dm_channels)
     }
     
     pub async fn fetch_channels(&self, guild_id: &str) -> Result<Vec<AppChannel>> {
@@ -129,8 +167,6 @@ struct Handler {
 #[serenity::async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("Connected as: {}", ready.user.name);
-        
         let guilds: Vec<AppGuild> = ready.guilds
             .iter()
             .map(|g| AppGuild::new(g.id.to_string(), g.id.to_string()))
@@ -144,6 +180,9 @@ impl EventHandler for Handler {
                 let _ = self.event_tx.send(DiscordEvent::Ready(vec![app_guild]));
             }
         }
+        
+        let username = ready.user.name.clone();
+        let _ = self.event_tx.send(DiscordEvent::Connected(username));
     }
     
     async fn message(&self, _ctx: Context, new_message: serenity::model::channel::Message) {

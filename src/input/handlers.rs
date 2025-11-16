@@ -147,6 +147,28 @@ fn select_sidebar_item(app: &mut App) {
     let items = app.get_sidebar_items();
     if let Some(item) = items.get(app.selected_sidebar_idx) {
         match item {
+            SidebarItem::DmSection => {
+                app.dm_section_expanded = !app.dm_section_expanded;
+                if app.dm_section_expanded && app.dms.is_empty() {
+                    app.loading_dms = true;
+                }
+            }
+            SidebarItem::DmChannel(dm) => {
+                app.selected_channel = Some(dm.id.clone());
+                app.message_scroll = 0;
+                
+                if let Some(messages) = app.message_cache.get(&dm.id) {
+                    app.messages = messages.clone();
+                } else {
+                    app.messages.clear();
+                    app.loading_messages = true;
+                }
+                
+                app.mode = AppMode::Messages;
+            }
+            SidebarItem::ServerSection => {
+                // Do nothing, just a label
+            }
             SidebarItem::Server(guild) => {
                 if let Some(g) = app.guilds.iter_mut().find(|g| g.id == guild.id) {
                     g.toggle_expanded();

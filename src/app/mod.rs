@@ -6,7 +6,7 @@ pub use mode::AppMode;
 pub use sidebar::SidebarItem;
 
 use crate::config::{Config, Theme, load_theme};
-use crate::models::{Guild, Channel, Message, AttachedFile};
+use crate::models::{Guild, Channel, Message, AttachedFile, DmChannel, Notification};
 use crate::discord::DiscordClient;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,6 +14,8 @@ use tokio::sync::Mutex;
 
 pub struct App {
     pub mode: AppMode,
+    pub dms: Vec<DmChannel>,
+    pub dm_section_expanded: bool,
     pub guilds: Vec<Guild>,
     pub selected_sidebar_idx: usize,
     pub selected_channel: Option<String>,
@@ -30,12 +32,16 @@ pub struct App {
     pub discord_client: Option<Arc<Mutex<DiscordClient>>>,
     pub loading_channels: bool,
     pub loading_messages: bool,
+    pub loading_dms: bool,
+    pub notifications: Vec<Notification>,
 }
 
 impl App {
     pub fn new(config: Config) -> Self {
         Self {
             mode: AppMode::Sidebar,
+            dms: Vec::new(),
+            dm_section_expanded: true,
             guilds: Vec::new(),
             selected_sidebar_idx: 0,
             selected_channel: None,
@@ -52,7 +58,17 @@ impl App {
             discord_client: None,
             loading_channels: false,
             loading_messages: false,
+            loading_dms: false,
+            notifications: Vec::new(),
         }
+    }
+
+    pub fn add_notification(&mut self, notification: Notification) {
+        self.notifications.push(notification);
+    }
+
+    pub fn clear_expired_notifications(&mut self) {
+        self.notifications.retain(|n| !n.is_expired());
     }
 
     pub fn theme(&self) -> &Theme {
@@ -65,15 +81,15 @@ impl App {
     }
 
     pub fn get_sidebar_items(&self) -> Vec<SidebarItem> {
-        sidebar::get_items(&self.guilds, &self.channel_cache)
+        sidebar::get_items(&self.dms, self.dm_section_expanded, &self.guilds, &self.channel_cache)
     }
 
     pub fn get_current_channel_name(&self) -> Option<String> {
-        state::get_channel_name(&self.selected_channel, &self.channel_cache)
+        state::get_channel_name(&self.selected_channel, &self.dms, &self.channel_cache)
     }
 
     pub fn get_current_guild_name(&self) -> Option<String> {
-        state::get_guild_name(&self.selected_channel, &self.guilds, &self.channel_cache)
+        state::get_guild_name(&self.selected_channel, &self.dms, &self.guilds, &self.channel_cache)
     }
     
     pub fn set_discord_client(&mut self, client: DiscordClient) {

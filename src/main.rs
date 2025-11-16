@@ -20,6 +20,7 @@ use app::App;
 use config::load_config;
 use input::handle_input;
 use discord::{DiscordClient, DiscordEvent};
+use models::Notification;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -102,6 +103,13 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
                 }
             }
         }
+        DiscordEvent::Connected(username) => {
+            app.add_notification(Notification::success(format!("Connected as {}", username)));
+        }
+        DiscordEvent::DmChannels(dms) => {
+            app.dms = dms;
+            app.loading_dms = false;
+        }
         DiscordEvent::GuildChannels(guild_id, channels) => {
             app.channel_cache.insert(guild_id, channels);
             app.loading_channels = false;
@@ -122,7 +130,7 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
                 .push(message);
         }
         DiscordEvent::Error(err) => {
-            eprintln!("Discord error: {}", err);
+            app.add_notification(Notification::error(format!("Error: {}", err)));
         }
     }
 }
@@ -134,6 +142,20 @@ async fn run_app(
     loop {
         {
             let mut app = app.lock().await;
+            
+            app.clear_expired_notifications();
+            
+            if app.loading_dms {
+                let client_arc = app.discord_client.clone();
+                if let Some(client_arc) = client_arc {
+                    let client = client_arc.lock().await;
+                    if let Ok(dms) = client.fetch_dms().await {
+                        drop(client);
+                        app.dms = dms;
+                    }
+                }
+                app.loading_dms = false;
+            }
             
             if app.loading_channels {
                 if let Some(guild) = app.guilds.iter().find(|g| g.expanded && !app.channel_cache.contains_key(&g.id)) {
@@ -190,14 +212,8 @@ async fn run_app(
                             let client_arc = app_lock.discord_client.clone();
                             if let Some(client_arc) = client_arc {
                                 let client = client_arc.lock().await;
-                                if let Ok(message) = client.send_message(&channel_id, &content).await {
-                                    drop(client);
-                                    app_lock.messages.push(message.clone());
-                                    app_lock.message_cache
-                                        .entry(channel_id)
-                                        .or_insert_with(Vec::new)
-                                        .push(message);
-                                }
+                                let _ = client.send_message(&channel_id, &content).await;
+                                drop(client);
                             }
                         }
                         

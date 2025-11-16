@@ -7,8 +7,8 @@ struct Handler;
 
 #[serenity::async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _ctx: Context, ready: Ready) {
-        println!("Connected as: {}", ready.user.name);
+    async fn ready(&self, _ctx: Context, _ready: Ready) {
+        // Connection notification is now handled via the event system
     }
 }
 
