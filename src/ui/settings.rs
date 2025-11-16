@@ -1,6 +1,5 @@
 use crate::app::{App, AppMode};
 use ratatui::{
-    layout::Rect,
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem},
     Frame,

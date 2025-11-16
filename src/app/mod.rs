@@ -7,7 +7,6 @@ pub use sidebar::SidebarItem;
 
 use crate::config::{Config, Theme, load_theme};
 use crate::models::{Guild, Channel, Message, AttachedFile};
-use crate::mock_data;
 use std::collections::HashMap;
 
 pub struct App {
@@ -46,7 +45,6 @@ impl App {
             settings_selected: 0,
         };
         
-        mock_data::load(&mut app);
         app
     }
 

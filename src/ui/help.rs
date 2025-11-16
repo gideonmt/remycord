@@ -35,8 +35,6 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from("Select a server to get started!"),
         Line::from(""),
-        Line::from(Span::styled("(Using mock data - no Discord connection)", 
-            Style::default().fg(theme.get_color("base03")))),
     ];
 
     let help = Paragraph::new(help_text)

@@ -3,7 +3,7 @@ mod config;
 mod ui;
 mod models;
 mod input;
-mod mock_data;
+mod discord;
 
 use anyhow::Result;
 use crossterm::{
@@ -18,11 +18,39 @@ use app::App;
 use config::load_config;
 use input::handle_input;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let config = load_config().unwrap_or_else(|e| {
-        eprintln!("Warning: Could not load config: {}.", e);
+        eprintln!("Warning: Could not load config: {}. Using defaults.", e);
         config::Config::default()
     });
+
+    match discord::token::get_token() {
+        Ok(token) => {
+            println!("Found Discord token, connecting...");
+            match discord::client::connect_and_verify(&token).await {
+                Ok(username) => {
+                    println!("Successfully logged in as: {}", username);
+                }
+                Err(e) => {
+                    eprintln!("Failed to connect to Discord: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("No Discord token found: {}", e);
+            eprintln!("To set up your token, run one of these commands:");
+            eprintln!("");
+            if cfg!(target_os = "windows") {
+                eprintln!("  cmdkey /add:remycord /user:token /pass:YOUR_DISCORD_TOKEN");
+            } else if cfg!(target_os = "macos") {
+                eprintln!("  security add-generic-password -s remycord -a token -w \"YOUR_DISCORD_TOKEN\"");
+            } else {
+                eprintln!("  secret-tool store --label=\"Discord Token\" service remycord username token");
+            }
+            eprintln!("");
+        }
+    }
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();

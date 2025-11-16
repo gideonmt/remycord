@@ -8,8 +8,6 @@ use ratatui::{
 };
 
 pub fn draw(f: &mut Frame, app: &App, area: Rect) {
-    let theme = app.theme();
-    
     let input_lines = app.input.lines().count().max(1).min(app.config.general.max_input_lines);
     let input_height = (input_lines + 2) as u16;
 
