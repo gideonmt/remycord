@@ -52,23 +52,23 @@ impl Default for GeneralSettings {
     }
 }
 
-pub fn get_config_path() -> Result<PathBuf> {
+pub fn get_config_dir() -> Result<PathBuf> {
     let config_dir = dirs::config_dir()
         .context("Could not find config directory")?
         .join("remycord");
     
     fs::create_dir_all(&config_dir)?;
-    Ok(config_dir.join("config.toml"))
+    Ok(config_dir)
+}
+
+pub fn get_config_path() -> Result<PathBuf> {
+    Ok(get_config_dir()?.join("config.toml"))
 }
 
 pub fn get_themes_dir() -> Result<PathBuf> {
-    let config_dir = dirs::config_dir()
-        .context("Could not find config directory")?
-        .join("remycord")
-        .join("themes");
-    
-    fs::create_dir_all(&config_dir)?;
-    Ok(config_dir)
+    let themes_dir = get_config_dir()?.join("themes");
+    fs::create_dir_all(&themes_dir)?;
+    Ok(themes_dir)
 }
 
 pub fn load_config() -> Result<Config> {

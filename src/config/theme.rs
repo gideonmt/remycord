@@ -29,33 +29,31 @@ pub struct Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Self::oxocarbon_dark()
+        // Minimal fallback - should never be used in practice
+        Self {
+            name: "Fallback".to_string(),
+            author: None,
+            base00: "#000000".to_string(),
+            base01: "#111111".to_string(),
+            base02: "#222222".to_string(),
+            base03: "#333333".to_string(),
+            base04: "#cccccc".to_string(),
+            base05: "#dddddd".to_string(),
+            base06: "#eeeeee".to_string(),
+            base07: "#ffffff".to_string(),
+            base08: "#ff0000".to_string(),
+            base09: "#ff8800".to_string(),
+            base0A: "#ffff00".to_string(),
+            base0B: "#00ff00".to_string(),
+            base0C: "#00ffff".to_string(),
+            base0D: "#0088ff".to_string(),
+            base0E: "#8800ff".to_string(),
+            base0F: "#ff00ff".to_string(),
+        }
     }
 }
 
 impl Theme {
-    pub fn oxocarbon_dark() -> Self {
-        Self {
-            name: "Oxocarbon Dark".to_string(),
-            author: Some("shaunsingh/IBM".to_string()),
-            base00: "#161616".to_string(),
-            base01: "#262626".to_string(),
-            base02: "#393939".to_string(),
-            base03: "#525252".to_string(),
-            base04: "#dde1e6".to_string(),
-            base05: "#f2f4f8".to_string(),
-            base06: "#ffffff".to_string(),
-            base07: "#08bdba".to_string(),
-            base08: "#3ddbd9".to_string(),
-            base09: "#78a9ff".to_string(),
-            base0A: "#ee5396".to_string(),
-            base0B: "#33b1ff".to_string(),
-            base0C: "#ff7eb6".to_string(),
-            base0D: "#42be65".to_string(),
-            base0E: "#be95ff".to_string(),
-            base0F: "#82cfff".to_string(),
-        }
-    }
 
     pub fn get_color(&self, base: &str) -> Color {
         let hex = match base {
@@ -99,9 +97,27 @@ pub fn create_default_theme() -> Result<()> {
     let theme_path = themes_dir.join("oxocarbon-dark.yaml");
     
     if !theme_path.exists() {
-        let theme = Theme::oxocarbon_dark();
-        let contents = serde_yaml::to_string(&theme)?;
-        fs::write(theme_path, contents)?;
+        // Write the YAML content directly
+        let yaml_content = "name: \"Oxocarbon Dark\"
+author: \"shaunsingh/IBM\"
+base00: \"#161616\"
+base01: \"#262626\"
+base02: \"#393939\"
+base03: \"#525252\"
+base04: \"#dde1e6\"
+base05: \"#f2f4f8\"
+base06: \"#ffffff\"
+base07: \"#08bdba\"
+base08: \"#3ddbd9\"
+base09: \"#78a9ff\"
+base0A: \"#ee5396\"
+base0B: \"#33b1ff\"
+base0C: \"#ff7eb6\"
+base0D: \"#42be65\"
+base0E: \"#be95ff\"
+base0F: \"#82cfff\"
+";
+        fs::write(theme_path, yaml_content)?;
     }
     
     Ok(())
