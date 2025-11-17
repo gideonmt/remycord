@@ -112,6 +112,8 @@ pub fn get_image_cache_dir() -> Result<PathBuf> {
 
 pub fn load_config() -> Result<Config> {
     let config_path = get_config_path()?;
+
+    println!("Loading config from {:?}", config_path);
     
     if config_path.exists() {
         let contents = fs::read_to_string(&config_path)?;
