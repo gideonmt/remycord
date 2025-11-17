@@ -8,6 +8,7 @@ pub use sidebar::SidebarItem;
 use crate::config::{Config, Theme, load_theme};
 use crate::models::{Guild, Channel, Message, AttachedFile, DmChannel, Notification};
 use crate::discord::DiscordClient;
+use crate::ui::image::ImageRenderer;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -34,6 +35,7 @@ pub struct App {
     pub loading_messages: bool,
     pub loading_dms: bool,
     pub notifications: Vec<Notification>,
+    pub image_renderer: ImageRenderer,
 }
 
 impl App {
@@ -60,6 +62,7 @@ impl App {
             loading_messages: false,
             loading_dms: false,
             notifications: Vec::new(),
+            image_renderer: ImageRenderer::new(),
         }
     }
 
@@ -94,5 +97,9 @@ impl App {
     
     pub fn set_discord_client(&mut self, client: DiscordClient) {
         self.discord_client = Some(Arc::new(Mutex::new(client)));
+    }
+
+    pub fn images_supported(&self) -> bool {
+        self.config.images.enabled && self.image_renderer.is_supported()
     }
 }

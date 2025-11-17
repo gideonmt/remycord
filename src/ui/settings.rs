@@ -11,6 +11,12 @@ pub fn draw(f: &mut Frame, app: &App) {
     let theme = app.theme();
     let area = centered_rect(80, 80, f.area());
     
+    let kitty_status = if app.image_renderer.is_supported() {
+        "✓ Kitty"
+    } else {
+        "✗ Not supported"
+    };
+    
     let settings_items = vec![
         format!("Username: {}", app.config.general.username),
         format!("File Manager: {}", app.config.general.file_manager),
@@ -19,6 +25,16 @@ pub fn draw(f: &mut Frame, app: &App) {
         format!("Message Scroll Speed: {}", app.config.general.message_scroll_speed),
         format!("Max Input Lines: {}", app.config.general.max_input_lines),
         format!("Theme: {}", app.config.theme_name),
+        "".to_string(),
+        format!("Image Support: {}", kitty_status),
+        format!("Images Enabled: {}", if app.config.images.enabled { "Yes" } else { "No" }),
+        format!("Render Avatars: {}", if app.config.images.render_avatars { "Yes" } else { "No" }),
+        format!("Render Custom Emojis: {}", if app.config.images.render_emojis { "Yes" } else { "No" }),
+        format!("Render Stickers: {}", if app.config.images.render_stickers { "Yes" } else { "No" }),
+        format!("Render Attachments: {}", if app.config.images.render_attachments { "Yes" } else { "No" }),
+        format!("Render Server Icons: {}", if app.config.images.render_server_icons { "Yes" } else { "No" }),
+        format!("Max Image Width: {} cols", app.config.images.max_image_width),
+        format!("Max Image Height: {} rows", app.config.images.max_image_height),
         "".to_string(),
         "Keybinds:".to_string(),
         format!("  Quit: {}{}", format_modifiers(&app.config.keybinds.quit.modifiers), app.config.keybinds.quit.key),

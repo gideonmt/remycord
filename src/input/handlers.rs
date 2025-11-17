@@ -110,7 +110,7 @@ pub fn handle_input_mode(app: &mut App, key: KeyEvent, kb: &Keybinds) {
 
 pub fn handle_settings_input(app: &mut App, key: KeyEvent, kb: &Keybinds) -> Result<()> {
     if key.code == KeyCode::Down || kb.down.matches(key.code, key.modifiers) {
-        if app.settings_selected < 17 {
+        if app.settings_selected < 27 { // Updated max index
             app.settings_selected += 1;
         }
     } else if key.code == KeyCode::Up || kb.up.matches(key.code, key.modifiers) {
@@ -238,6 +238,32 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         6 => cycle_theme(app)?,
+        // Skip 7 (empty line)
+        // Skip 8 (Image Support - read-only)
+        9 => app.config.images.enabled = !app.config.images.enabled,
+        10 => app.config.images.render_avatars = !app.config.images.render_avatars,
+        11 => app.config.images.render_emojis = !app.config.images.render_emojis,
+        12 => app.config.images.render_stickers = !app.config.images.render_stickers,
+        13 => app.config.images.render_attachments = !app.config.images.render_attachments,
+        14 => app.config.images.render_server_icons = !app.config.images.render_server_icons,
+        15 => {
+            app.config.images.max_image_width = match app.config.images.max_image_width {
+                10 => 20,
+                20 => 30,
+                30 => 40,
+                40 => 50,
+                _ => 10,
+            };
+        }
+        16 => {
+            app.config.images.max_image_height = match app.config.images.max_image_height {
+                5 => 10,
+                10 => 15,
+                15 => 20,
+                20 => 25,
+                _ => 5,
+            };
+        }
         _ => {}
     }
     
@@ -260,15 +286,15 @@ fn cycle_theme(app: &mut App) -> Result<()> {
 
 fn start_keybind_recording(app: &mut App) {
     let action = match app.settings_selected {
-        9 => Some("Quit"),
-        10 => Some("Settings"),
-        11 => Some("Up"),
-        12 => Some("Down"),
-        13 => Some("Select"),
-        14 => Some("Back"),
-        15 => Some("Input Mode"),
-        16 => Some("Attach File"),
-        17 => Some("Send Message"),
+        19 => Some("Quit"),
+        20 => Some("Settings"),
+        21 => Some("Up"),
+        22 => Some("Down"),
+        23 => Some("Select"),
+        24 => Some("Back"),
+        25 => Some("Input Mode"),
+        26 => Some("Attach File"),
+        27 => Some("Send Message"),
         _ => None,
     };
     

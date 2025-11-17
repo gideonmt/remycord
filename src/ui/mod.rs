@@ -3,6 +3,7 @@ mod messages;
 mod settings;
 mod help;
 mod utils;
+pub mod image;
 
 use crate::app::{App, AppMode};
 use ratatui::Frame;
