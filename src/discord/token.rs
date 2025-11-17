@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 #[cfg(target_os = "windows")]
-pub fn get_token() -> Result<String> {
+pub async fn get_token() -> Result<String> {
     use windows::Win32::Security::Credentials::{
         CredReadW, CredFree, CREDENTIALW, CRED_TYPE_GENERIC,
     };
@@ -38,7 +38,7 @@ pub fn get_token() -> Result<String> {
 }
 
 #[cfg(target_os = "macos")]
-pub fn get_token() -> Result<String> {
+pub async fn get_token() -> Result<String> {
     use security_framework::passwords::get_generic_password;
     
     let password = get_generic_password("remycord", "token")
@@ -48,19 +48,21 @@ pub fn get_token() -> Result<String> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn get_token() -> Result<String> {
+pub async fn get_token() -> Result<String> {
     use secret_service::SecretService;
     use secret_service::EncryptionType;
     
     let ss = SecretService::connect(EncryptionType::Dh)
+        .await
         .context("Failed to connect to Secret Service")?;
     
     let collection = ss.get_default_collection()
+        .await
         .context("Failed to get default collection")?;
     
     let items = collection.search_items(
         vec![("service", "remycord"), ("username", "token")]
-    ).context("Failed to search for token")?;
+    ).await.context("Failed to search for token")?;
     
     if items.is_empty() {
         anyhow::bail!("Token not found in keyring");
@@ -68,12 +70,13 @@ pub fn get_token() -> Result<String> {
     
     let item = &items[0];
     let secret = item.get_secret()
+        .await
         .context("Failed to get secret from keyring")?;
     
     String::from_utf8(secret).context("Invalid UTF-8 in stored token")
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub fn get_token() -> Result<String> {
+pub async fn get_token() -> Result<String> {
     anyhow::bail!("Token storage not supported on this platform")
 }

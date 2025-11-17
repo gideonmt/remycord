@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
         config::Config::default()
     });
 
-    let token = match discord::token::get_token() {
+    let token = match discord::token::get_token().await {
         Ok(token) => {
             println!("Found Discord token, connecting...");
             token
