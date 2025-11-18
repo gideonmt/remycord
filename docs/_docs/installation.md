@@ -1,109 +1,74 @@
 ---
-layout: doc
+layout: default
 title: Installation
 ---
 
+# Installation
+
 ## Requirements
 
-- **Rust 1.70+** - Install from [rustup.rs](https://rustup.rs/)
-- **Discord Account** - You'll need a Discord user token
-- **Terminal Emulator** - Any modern terminal works, Kitty recommended for image support
+- Rust 1.70 or later
+- Discord user token
+- Modern terminal emulator
 
-### Platform-Specific Requirements
-
-#### macOS
-- Xcode Command Line Tools: `xcode-select --install`
-- Keychain access for secure token storage
-
-#### Linux
-- Build essentials: `sudo apt install build-essential pkg-config`
-- GNOME Keyring: `sudo apt install gnome-keyring libsecret-1-dev`
-- D-Bus session running
-
-#### Windows
-- Visual Studio Build Tools
-- Windows Credential Manager (built-in)
-
-## Installation Methods
-
-### From Source (Recommended)
-
-Clone and build from the repository:
+## From Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/remycord.git
+git clone https://github.com/yourusername/remycord
 cd remycord
-
-# Build and install
+cargo build --release
 cargo install --path .
 ```
 
-The binary will be installed to `~/.cargo/bin/remycord`.
+## Setting Up Your Token
 
-### Using Cargo
+Your Discord token is stored securely using OS-native credential storage.
 
-Install directly from crates.io (once published):
-
-```bash
-cargo install remycord
-```
-
-### Pre-built Binaries
-
-Download pre-built binaries from the [releases page](https://github.com/yourusername/remycord/releases).
-
-#### Linux
-```bash
-# Download and extract
-wget https://github.com/yourusername/remycord/releases/latest/download/remycord-linux.tar.gz
-tar xzf remycord-linux.tar.gz
-
-# Move to PATH
-sudo mv remycord /usr/local/bin/
-```
-
-#### macOS
-```bash
-# Download and extract
-curl -LO https://github.com/yourusername/remycord/releases/latest/download/remycord-macos.tar.gz
-tar xzf remycord-macos.tar.gz
-
-# Move to PATH
-sudo mv remycord /usr/local/bin/
-```
-
-#### Windows
-Download `remycord-windows.zip` from releases and extract to a directory in your PATH.
-
-## Verification
-
-Verify the installation:
+### macOS
 
 ```bash
-remycord --version
+security add-generic-password -s remycord -a token -w "YOUR_DISCORD_TOKEN"
 ```
 
-## Next Steps
+### Linux
 
-After installation, you need to:
+```bash
+secret-tool store --label="Discord Token" service remycord username token
+```
 
-1. [Set up your Discord token]({{ '/docs/token-setup/' | relative_url }})
-2. [Configure remycord]({{ '/docs/configuration/' | relative_url }})
-3. [Learn the keybindings]({{ '/docs/keybindings/' | relative_url }})
+Then enter your token when prompted.
+
+### Windows
+
+```powershell
+cmdkey /add:remycord /user:token /pass:YOUR_DISCORD_TOKEN
+```
+
+## Getting Your Discord Token
+
+1. Open Discord in your web browser
+2. Open Developer Tools (F12)
+3. Go to Application → Local Storage → discord.com
+4. Find the `token` key and copy its value
+
+**Warning:** Never share your token with anyone.
+
+## Running remycord
+
+```bash
+remycord
+```
+
+If everything is set up correctly, you'll see a connection message and the main interface.
 
 ## Troubleshooting
 
-### Cargo not found
-Make sure `~/.cargo/bin` is in your PATH:
+### Token not found
 
-```bash
-export PATH="$HOME/.cargo/bin:$PATH"
-```
+Make sure you stored the token with the exact service name `remycord` and account name `token`.
 
-Add this to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.).
+### Build errors on Linux
 
-### Build failures on Linux
 Install required dependencies:
 
 ```bash
@@ -112,14 +77,12 @@ sudo apt install build-essential pkg-config libssl-dev
 
 # Fedora
 sudo dnf install gcc pkg-config openssl-devel
-
-# Arch
-sudo pacman -S base-devel openssl
 ```
 
-### Permission denied (macOS)
-If you get permission denied when moving to `/usr/local/bin`, use:
+### Permission denied
+
+Make sure `~/.cargo/bin` is in your PATH:
 
 ```bash
-sudo chown -R $(whoami) /usr/local/bin
+export PATH="$HOME/.cargo/bin:$PATH"
 ```
