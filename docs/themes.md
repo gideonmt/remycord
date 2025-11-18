@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Themes
+permalink: /configuration/themes
 ---
 
 ## Overview
