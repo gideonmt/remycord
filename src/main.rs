@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
         config::Config::default()
     });
 
+    // Await the async get_token
     let token = match discord::token::get_token().await {
         Ok(token) => {
             println!("Found Discord token, connecting...");
@@ -106,32 +107,7 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
         DiscordEvent::Connected(username) => {
             app.add_notification(Notification::success(format!("Connected as {}", username)));
         }
-        DiscordEvent::DmChannels(dms) => {
-            app.dms = dms;
-            app.loading_dms = false;
-        }
-        DiscordEvent::GuildChannels(guild_id, channels) => {
-            app.channel_cache.insert(guild_id, channels);
-            app.loading_channels = false;
-        }
-        DiscordEvent::Messages(channel_id, messages) => {
-            app.messages = messages.clone();
-            app.message_cache.insert(channel_id, messages);
-            app.loading_messages = false;
-        }
-        DiscordEvent::NewMessage(message) => {
-            if Some(&message.channel_id) == app.selected_channel.as_ref() {
-                app.messages.push(message.clone());
-            }
-            
-            app.message_cache
-                .entry(message.channel_id.clone())
-                .or_insert_with(Vec::new)
-                .push(message);
-        }
-        DiscordEvent::Error(err) => {
-            app.add_notification(Notification::error(format!("Error: {}", err)));
-        }
+        _ => {}
     }
 }
 
