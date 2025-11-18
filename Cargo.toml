@@ -21,7 +21,7 @@ image = "0.25"
 zbus = { version = "3.15.2", features = ["tokio"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.52", features = ["Win32_Security_Credentials"] }
+windows = { version = "0.52", features = ["Win32_Security_Credentials", "Win32_Foundation"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "2.9"
