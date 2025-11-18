@@ -1,0 +1,59 @@
+---
+layout: default
+---
+
+<div class="docs-wrapper">
+  <aside class="docs-sidebar">
+    <nav class="docs-nav">
+      <h3>Getting Started</h3>
+      <ul>
+        <li><a href="{{ '/docs/installation/' | relative_url }}" {% if page.url contains '/installation/' %}class="active"{% endif %}>Installation</a></li>
+        <li><a href="{{ '/docs/getting-started/' | relative_url }}" {% if page.url contains '/getting-started/' %}class="active"{% endif %}>Getting Started</a></li>
+        <li><a href="{{ '/docs/token-setup/' | relative_url }}" {% if page.url contains '/token-setup/' %}class="active"{% endif %}>Token Setup</a></li>
+      </ul>
+      
+      <h3>Configuration</h3>
+      <ul>
+        <li><a href="{{ '/docs/configuration/' | relative_url }}" {% if page.url contains '/configuration/' %}class="active"{% endif %}>Overview</a></li>
+        <li><a href="{{ '/docs/keybindings/' | relative_url }}" {% if page.url contains '/keybindings/' %}class="active"{% endif %}>Keybindings</a></li>
+        <li><a href="{{ '/docs/themes/' | relative_url }}" {% if page.url contains '/themes/' %}class="active"{% endif %}>Themes</a></li>
+        <li><a href="{{ '/docs/images/' | relative_url }}" {% if page.url contains '/images/' %}class="active"{% endif %}>Image Support</a></li>
+      </ul>
+      
+      <h3>Features</h3>
+      <ul>
+        <li><a href="{{ '/docs/navigation/' | relative_url }}" {% if page.url contains '/navigation/' %}class="active"{% endif %}>Navigation</a></li>
+        <li><a href="{{ '/docs/messaging/' | relative_url }}" {% if page.url contains '/messaging/' %}class="active"{% endif %}>Messaging</a></li>
+        <li><a href="{{ '/docs/file-attachments/' | relative_url }}" {% if page.url contains '/file-attachments/' %}class="active"{% endif %}>File Attachments</a></li>
+      </ul>
+      
+      <h3>Development</h3>
+      <ul>
+        <li><a href="{{ '/docs/building/' | relative_url }}" {% if page.url contains '/building/' %}class="active"{% endif %}>Building from Source</a></li>
+        <li><a href="{{ '/docs/contributing/' | relative_url }}" {% if page.url contains '/contributing/' %}class="active"{% endif %}>Contributing</a></li>
+      </ul>
+    </nav>
+  </aside>
+  
+  <div class="docs-content">
+    <article>
+      <h1>{{ page.title }}</h1>
+      {{ content }}
+      
+      {% if page.prev_page or page.next_page %}
+      <div class="docs-navigation">
+        {% if page.prev_page %}
+        <a href="{{ page.prev_page.url | relative_url }}" class="prev">
+          ← {{ page.prev_page.title }}
+        </a>
+        {% endif %}
+        {% if page.next_page %}
+        <a href="{{ page.next_page.url | relative_url }}" class="next">
+          {{ page.next_page.title }} →
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </article>
+  </div>
+</div>
