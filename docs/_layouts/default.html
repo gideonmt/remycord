@@ -6,74 +6,39 @@
   <title>{% if page.title %}{{ page.title }} | {% endif %}{{ site.title }}</title>
   <meta name="description" content="{{ page.description | default: site.description }}">
   <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
 </head>
 <body>
   <nav class="navbar">
     <div class="container">
-      <div class="navbar-brand">
-        <a href="{{ '/' | relative_url }}">
-          <span class="logo">remycord</span>
-        </a>
-      </div>
-      <div class="navbar-menu" id="navbarMenu">
-        <a href="{{ '/docs/installation/' | relative_url }}" class="navbar-item">Installation</a>
-        <a href="{{ '/docs/getting-started/' | relative_url }}" class="navbar-item">Getting Started</a>
-        <a href="{{ '/docs/configuration/' | relative_url }}" class="navbar-item">Configuration</a>
-        <a href="{{ '/docs/keybindings/' | relative_url }}" class="navbar-item">Keybindings</a>
-        <a href="https://github.com/yourusername/remycord" class="navbar-item">GitHub</a>
-      </div>
-      <button class="navbar-burger" id="navbarBurger">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
+      <a href="{{ '/' | relative_url }}" class="logo">{{ site.title }}</a>
+      <ul class="nav-links" id="navLinks">
+        {% for item in site.navigation %}
+        <li>
+          {% if item.external %}
+          <a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a>
+          {% else %}
+          <a href="{{ item.url | relative_url }}" {% if page.url == item.url %}class="active"{% endif %}>{{ item.title }}</a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <button class="nav-toggle" id="navToggle">☰</button>
     </div>
   </nav>
 
-  <main>
+  <main class="container">
     {{ content }}
   </main>
 
-  <footer class="footer">
+  <footer>
     <div class="container">
-      <div class="footer-content">
-        <div class="footer-section">
-          <h4>remycord</h4>
-          <p>A Discord TUI client built with Rust</p>
-        </div>
-        <div class="footer-section">
-          <h4>Documentation</h4>
-          <ul>
-            <li><a href="{{ '/docs/installation/' | relative_url }}">Installation</a></li>
-            <li><a href="{{ '/docs/getting-started/' | relative_url }}">Getting Started</a></li>
-            <li><a href="{{ '/docs/configuration/' | relative_url }}">Configuration</a></li>
-          </ul>
-        </div>
-        <div class="footer-section">
-          <h4>Community</h4>
-          <ul>
-            <li><a href="https://github.com/yourusername/remycord">GitHub</a></li>
-            <li><a href="https://github.com/yourusername/remycord/issues">Issues</a></li>
-            <li><a href="https://github.com/yourusername/remycord/discussions">Discussions</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>&copy; 2024 remycord. Released under MIT License.</p>
-      </div>
+      <p>&copy; 2024 {{ site.title }}. MIT License.</p>
     </div>
   </footer>
 
   <script>
-    const burger = document.getElementById('navbarBurger');
-    const menu = document.getElementById('navbarMenu');
-    
-    burger.addEventListener('click', () => {
-      burger.classList.toggle('is-active');
-      menu.classList.toggle('is-active');
+    document.getElementById('navToggle').addEventListener('click', function() {
+      document.getElementById('navLinks').classList.toggle('active');
     });
   </script>
 </body>

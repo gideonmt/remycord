@@ -1,29 +1,27 @@
 title: remycord
-description: A Discord TUI client made with Rust and Ratatui
-baseurl: "/remycord"
-url: "https://gideonmt.github.io"
+description: A Discord TUI client built with Rust and Ratatui
+baseurl: ""
+url: "https://yourusername.github.io"
 
 markdown: kramdown
-theme: minima
 
-plugins:
-  - jekyll-feed
-  - jekyll-seo-tag
-
-collections:
-  docs:
-    output: true
-    permalink: /:collection/:path/
-
-defaults:
-  - scope:
-      path: ""
-      type: "docs"
-    values:
-      layout: "doc"
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Installation
+    url: /installation/
+  - title: Configuration
+    url: /configuration/
+  - title: Themes
+    url: /configuration/themes
+  - title: GitHub
+    url: https://github.com/yourusername/remycord
+    external: true
 
 exclude:
   - Gemfile
   - Gemfile.lock
   - node_modules
   - vendor
+  - README.md

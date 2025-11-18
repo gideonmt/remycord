@@ -1,21 +1,13 @@
 ---
-layout: doc
+layout: default
 title: Configuration
 ---
 
-## Configuration File Location
+# Configuration
 
-remycord stores its configuration in:
+Configuration file is located at `~/.config/remycord/config.toml` (Linux/macOS) or `%APPDATA%\remycord\config.toml` (Windows).
 
-- **macOS**: `~/Library/Application Support/remycord/config.toml`
-- **Linux**: `~/.config/remycord/config.toml`
-- **Windows**: `%APPDATA%\remycord\config.toml`
-
-The configuration file is automatically created on first launch with sensible defaults.
-
-## Configuration Structure
-
-The configuration file is in TOML format with the following sections:
+## General Settings
 
 ```toml
 [general]
@@ -25,7 +17,20 @@ show_timestamps = true
 show_typing_indicators = true
 message_scroll_speed = 1
 max_input_lines = 8
+```
 
+- `username` - Display name for your messages
+- `file_manager` - File picker for attachments (`fzf` or `lf`)
+- `show_timestamps` - Show message timestamps
+- `show_typing_indicators` - Display typing indicators
+- `message_scroll_speed` - Lines per scroll (1-5)
+- `max_input_lines` - Maximum input box height (4-12)
+
+## Image Settings
+
+This is still a **work in progress** feature.
+
+```toml
 [images]
 enabled = true
 render_avatars = true
@@ -35,224 +40,64 @@ render_attachments = true
 render_server_icons = true
 max_image_width = 30
 max_image_height = 15
-
-theme_name = "oxocarbon-dark"
-
-[keybinds]
-# See keybindings documentation
 ```
 
-## General Settings
+Image support requires Kitty terminal or compatible terminal emulator.
 
-### username
-- **Type**: String
-- **Default**: `"You"`
-- **Description**: Display name for your messages
+## Themes
 
-### file_manager
-- **Type**: String
-- **Default**: `"fzf"`
-- **Options**: `"fzf"`, `"lf"`
-- **Description**: File picker for attachments
+```toml
+theme_name = "oxocarbon-dark"
+```
 
-### show_timestamps
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Show message timestamps
+Themes are Base16 YAML files stored in `~/.config/remycord/themes/`.
 
-### show_typing_indicators
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Display when others are typing
+See (themes)[/themes] for more. 
 
-### message_scroll_speed
-- **Type**: Integer
-- **Default**: `1`
-- **Range**: 1-5
-- **Description**: Lines scrolled per keypress
+## Keybindings
 
-### max_input_lines
-- **Type**: Integer
-- **Default**: `8`
-- **Range**: 4-12
-- **Description**: Maximum lines for input box
+```toml
+[keybinds]
+quit = { key = "q", modifiers = [] }
+settings = { key = "s", modifiers = [] }
+up = { key = "k", modifiers = [] }
+down = { key = "j", modifiers = [] }
+select = { key = "Enter", modifiers = [] }
+back = { key = "Esc", modifiers = [] }
+input_mode = { key = "i", modifiers = [] }
+attach_file = { key = "a", modifiers = [] }
+scroll_up = { key = "k", modifiers = [] }
+scroll_down = { key = "j", modifiers = [] }
+send_message = { key = "Enter", modifiers = [] }
+cancel_input = { key = "Esc", modifiers = [] }
+cursor_left = { key = "Left", modifiers = [] }
+cursor_right = { key = "Right", modifiers = [] }
+cursor_start = { key = "a", modifiers = ["Ctrl"] }
+cursor_end = { key = "e", modifiers = ["Ctrl"] }
+```
 
-## Image Settings
+Available modifiers: `"Ctrl"`, `"Alt"`, `"Shift"`
 
-Image support requires a compatible terminal (Kitty recommended).
+### Custom Keybindings Example
 
-### enabled
-- **Type**: Boolean
-- **Default**: Auto-detected (true if Kitty)
-- **Description**: Enable image rendering
-
-### render_avatars
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Show user avatars
-
-### render_emojis
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Render custom Discord emojis
-
-### render_stickers
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Display Discord stickers
-
-### render_attachments
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Show image attachments inline
-
-### render_server_icons
-- **Type**: Boolean
-- **Default**: `true`
-- **Description**: Display server icons in sidebar
-
-### max_image_width
-- **Type**: Integer
-- **Default**: `30`
-- **Description**: Maximum image width in columns
-
-### max_image_height
-- **Type**: Integer
-- **Default**: `15`
-- **Description**: Maximum image height in rows
-
-## Theme Settings
-
-### theme_name
-- **Type**: String
-- **Default**: `"oxocarbon-dark"`
-- **Description**: Active theme name
-
-Themes are stored in `~/.config/remycord/themes/` as YAML files.
-
-See [Themes documentation]({{ '/docs/themes/' | relative_url }}) for more details.
+```toml
+[keybinds]
+quit = { key = "q", modifiers = ["Ctrl"] }
+settings = { key = ",", modifiers = [] }
+send_message = { key = "Enter", modifiers = ["Ctrl"] }
+```
 
 ## Editing Configuration
 
-### Using Settings Menu
+You can edit settings in two ways:
 
-The easiest way to change settings:
-
-1. Press `s` to open settings
-2. Navigate with `↑`/`↓`
-3. Press `Enter` to toggle/cycle values
-4. Press `Esc` to save and exit
-
-### Manual Editing
-
-You can also edit the config file directly:
-
-```bash
-# macOS/Linux
-vim ~/.config/remycord/config.toml
-
-# Windows
-notepad %APPDATA%\remycord\config.toml
-```
-
-Changes take effect after restarting remycord.
-
-## Configuration Examples
-
-### Minimal Setup
-```toml
-[general]
-username = "Me"
-file_manager = "fzf"
-show_timestamps = false
-show_typing_indicators = false
-
-[images]
-enabled = false
-
-theme_name = "oxocarbon-dark"
-```
-
-### Power User Setup
-```toml
-[general]
-username = "PowerUser"
-file_manager = "lf"
-show_timestamps = true
-show_typing_indicators = true
-message_scroll_speed = 3
-max_input_lines = 12
-
-[images]
-enabled = true
-render_avatars = true
-render_emojis = true
-render_stickers = true
-render_attachments = true
-render_server_icons = true
-max_image_width = 50
-max_image_height = 25
-
-theme_name = "gruvbox-dark"
-```
-
-### Performance-Focused
-```toml
-[general]
-username = "FastUser"
-file_manager = "fzf"
-show_timestamps = false
-show_typing_indicators = false
-message_scroll_speed = 5
-max_input_lines = 4
-
-[images]
-enabled = false
-
-theme_name = "oxocarbon-dark"
-```
+1. **Settings menu** - Press `s` and navigate with arrow keys
+2. **Manual edit** - Edit `config.toml` directly and restart
 
 ## Resetting Configuration
 
-To reset to defaults:
-
-1. Delete the config file
-2. Restart remycord
-3. A new config will be created
+Delete the config file to reset to defaults:
 
 ```bash
-# macOS/Linux
 rm ~/.config/remycord/config.toml
-
-# Windows
-del %APPDATA%\remycord\config.toml
-```
-
-## Configuration Validation
-
-remycord validates your configuration on startup. If there are errors:
-
-1. The error will be displayed
-2. Default values will be used
-3. Check your config file for syntax errors
-
-Common issues:
-- Invalid TOML syntax
-- Incorrect value types
-- Out-of-range values
-
-## Environment Variables
-
-Some settings can be overridden with environment variables:
-
-```bash
-# Force enable/disable images
-REMYCORD_IMAGES=1 remycord  # Enable
-REMYCORD_IMAGES=0 remycord  # Disable
-
-# Override theme
-REMYCORD_THEME=gruvbox-dark remycord
-
-# Config file location
-REMYCORD_CONFIG=/path/to/config.toml remycord
 ```
