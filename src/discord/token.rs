@@ -51,6 +51,7 @@ pub async fn get_token() -> Result<String> {
 pub async fn get_token() -> Result<String> {
     use secret_service::SecretService;
     use secret_service::EncryptionType;
+    use std::collections::HashMap;
     
     let ss = SecretService::connect(EncryptionType::Dh)
         .await
@@ -60,9 +61,13 @@ pub async fn get_token() -> Result<String> {
         .await
         .context("Failed to get default collection")?;
     
-    let items = collection.search_items(
-        vec![("service", "remycord"), ("username", "token")]
-    ).await.context("Failed to search for token")?;
+    let mut search_attributes = HashMap::new();
+    search_attributes.insert("service", "remycord");
+    search_attributes.insert("username", "token");
+    
+    let items = collection.search_items(search_attributes)
+        .await
+        .context("Failed to search for token")?;
     
     if items.is_empty() {
         anyhow::bail!("Token not found in keyring");
