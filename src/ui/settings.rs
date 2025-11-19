@@ -11,10 +11,10 @@ pub fn draw(f: &mut Frame, app: &App) {
     let theme = app.theme();
     let area = centered_rect(80, 80, f.area());
     
-    let kitty_status = if app.image_renderer.is_supported() {
-        "✓ Kitty"
+    let protocol_status = if app.image_renderer.is_supported() {
+        format!("✓ {}", app.image_renderer.protocol_name())
     } else {
-        "✗ Not supported"
+        format!("✗ {} (fallback only)", app.image_renderer.protocol_name())
     };
     
     let settings_items = vec![
@@ -26,7 +26,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         format!("Max Input Lines: {}", app.config.general.max_input_lines),
         format!("Theme: {}", app.config.theme_name),
         "".to_string(),
-        format!("Image Support: {}", kitty_status),
+        format!("Image Protocol: {}", protocol_status),
         format!("Images Enabled: {}", if app.config.images.enabled { "Yes" } else { "No" }),
         format!("Render Avatars: {}", if app.config.images.render_avatars { "Yes" } else { "No" }),
         format!("Render Custom Emojis: {}", if app.config.images.render_emojis { "Yes" } else { "No" }),

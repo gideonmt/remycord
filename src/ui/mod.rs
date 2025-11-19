@@ -9,7 +9,7 @@ use crate::app::{App, AppMode};
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout};
 
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &mut App) {
     match &app.mode {
         AppMode::Settings | AppMode::KeybindRecording(_) => {
             settings::draw(f, app);

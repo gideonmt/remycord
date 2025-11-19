@@ -1,110 +1,90 @@
 use anyhow::Result;
-use std::io::Write;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageProtocol {
-    Kitty,
-    None,
-}
+use image::DynamicImage;
+use ratatui_image::picker::{Picker, ProtocolType};
+use ratatui_image::protocol::StatefulProtocol;
+use std::collections::HashMap;
 
 pub struct ImageRenderer {
-    protocol: ImageProtocol,
+    picker: Picker,
+    avatar_cache: HashMap<String, StatefulProtocol>,
 }
 
 impl ImageRenderer {
     pub fn new() -> Self {
-        Self {
-            protocol: Self::detect_protocol(),
-        }
-    }
-
-    fn detect_protocol() -> ImageProtocol {
-        if std::env::var("TERM").unwrap_or_default().contains("kitty") {
-            return ImageProtocol::Kitty;
-        }
+        let picker = Picker::from_query_stdio()
+            .unwrap_or_else(|_| Picker::from_fontsize((8, 12)));
         
-        if std::env::var("KITTY_WINDOW_ID").is_ok() {
-            return ImageProtocol::Kitty;
+        Self {
+            picker,
+            avatar_cache: HashMap::new(),
         }
-
-        ImageProtocol::None
     }
 
     pub fn is_supported(&self) -> bool {
-        self.protocol != ImageProtocol::None
+        !matches!(self.picker.protocol_type(), ProtocolType::Halfblocks)
     }
 
-    pub fn protocol(&self) -> ImageProtocol {
-        self.protocol
-    }
-
-    /// Render image at specific terminal position using Kitty graphics protocol
-    pub fn render_image(&self, image_data: &[u8], x: u16, y: u16, width: u16, height: u16) -> Result<()> {
-        match self.protocol {
-            ImageProtocol::Kitty => self.render_kitty(image_data, x, y, width, height),
-            ImageProtocol::None => Ok(()),
+    pub fn protocol_name(&self) -> &str {
+        match self.picker.protocol_type() {
+            ProtocolType::Halfblocks => "Halfblocks",
+            ProtocolType::Sixel => "Sixel",
+            ProtocolType::Kitty => "Kitty",
+            ProtocolType::Iterm2 => "iTerm2",
         }
     }
 
-    fn render_kitty(&self, image_data: &[u8], x: u16, y: u16, width: u16, height: u16) -> Result<()> {
-        let encoded = BASE64.encode(image_data);
+    /// Get a default Discord avatar URL for a user
+    pub fn get_default_avatar_url(user_id: &str) -> String {
+        // Use last digit of user ID to determine which default avatar (0-5)
+        let avatar_num = user_id
+            .chars()
+            .last()
+            .and_then(|c| c.to_digit(10))
+            .unwrap_or(0) % 6;
         
-        // Kitty graphics protocol escape sequence
-        // Format: \x1b_G<control_data>;<payload>\x1b\\
-        // a=T: transmit and display
-        // f=100: PNG format (can also be 24 for RGB, 32 for RGBA)
-        // t=d: direct transmission (data inline)
-        // c=<cols>: width in columns
-        // r=<rows>: height in rows
-        // X=<x>: x position
-        // Y=<y>: y position
+        format!("https://cdn.discordapp.com/embed/avatars/{}.png", avatar_num)
+    }
+
+    /// Download and cache an avatar image
+    pub async fn load_avatar(&mut self, user_id: &str) -> Result<()> {
+        if self.avatar_cache.contains_key(user_id) {
+            return Ok(());
+        }
+
+        let url = Self::get_default_avatar_url(user_id);
+        let response = reqwest::get(&url).await?;
+        let bytes = response.bytes().await?;
+        let img = image::load_from_memory(&bytes)?;
         
-        let control = format!("a=T,f=100,t=d,c={},r={},X={},Y={}", width, height, x, y);
-        let escape_seq = format!("\x1b_G{};{}\x1b\\", control, encoded);
+        // Resize to a reasonable size for terminal display
+        let resized = img.resize(32, 32, image::imageops::FilterType::Lanczos3);
+        let protocol = self.picker.new_resize_protocol(resized);
         
-        std::io::stdout().write_all(escape_seq.as_bytes())?;
-        std::io::stdout().flush()?;
+        self.avatar_cache.insert(user_id.to_string(), protocol);
         
         Ok(())
     }
 
-    /// Download and render image from URL
-    pub async fn render_url(&self, url: &str, x: u16, y: u16, width: u16, height: u16) -> Result<()> {
-        if !self.is_supported() {
-            return Ok(());
-        }
-
-        let response = reqwest::get(url).await?;
-        let image_data = response.bytes().await?;
-        
-        self.render_image(&image_data, x, y, width, height)
+    /// Get a cached avatar protocol for rendering
+    pub fn get_avatar(&mut self, user_id: &str) -> Option<&mut StatefulProtocol> {
+        self.avatar_cache.get_mut(user_id)
     }
 
-    /// Clear image at position
-    pub fn clear_image(&self, image_id: u32) -> Result<()> {
-        match self.protocol {
-            ImageProtocol::Kitty => {
-                let escape_seq = format!("\x1b_Ga=d,d=I,i={}\x1b\\", image_id);
-                std::io::stdout().write_all(escape_seq.as_bytes())?;
-                std::io::stdout().flush()?;
-                Ok(())
-            }
-            ImageProtocol::None => Ok(()),
-        }
+    /// Clear the avatar cache
+    pub fn clear_cache(&mut self) {
+        self.avatar_cache.clear();
     }
 
-    /// Clear all images
-    pub fn clear_all_images(&self) -> Result<()> {
-        match self.protocol {
-            ImageProtocol::Kitty => {
-                let escape_seq = "\x1b_Ga=d,d=A\x1b\\";
-                std::io::stdout().write_all(escape_seq.as_bytes())?;
-                std::io::stdout().flush()?;
-                Ok(())
-            }
-            ImageProtocol::None => Ok(()),
-        }
+    /// Load an image from bytes
+    pub fn load_image(&mut self, bytes: &[u8]) -> Result<StatefulProtocol> {
+        let img = image::load_from_memory(bytes)?;
+        let protocol = self.picker.new_resize_protocol(img);
+        Ok(protocol)
+    }
+
+    /// Load an image from a DynamicImage
+    pub fn load_dynamic_image(&mut self, img: DynamicImage) -> StatefulProtocol {
+        self.picker.new_resize_protocol(img)
     }
 }
 
@@ -119,8 +99,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_protocol_detection() {
-        let renderer = ImageRenderer::new();
-        let _ = renderer.protocol();
+    fn test_default_avatar_url() {
+        let url = ImageRenderer::get_default_avatar_url("123456789");
+        assert!(url.starts_with("https://cdn.discordapp.com/embed/avatars/"));
+        assert!(url.ends_with(".png"));
+    }
+
+    #[test]
+    fn test_avatar_number_range() {
+        for i in 0..10 {
+            let user_id = format!("{}", i);
+            let url = ImageRenderer::get_default_avatar_url(&user_id);
+            let num = url
+                .trim_end_matches(".png")
+                .chars()
+                .last()
+                .and_then(|c| c.to_digit(10))
+                .unwrap();
+            assert!(num <= 5);
+        }
     }
 }

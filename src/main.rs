@@ -157,6 +157,14 @@ async fn run_app(
                             if let Ok(messages) = client.fetch_messages(channel_id, 50).await {
                                 drop(client);
                                 app.messages = messages.clone();
+                                
+                                if app.config.images.enabled && app.config.images.render_avatars {
+                                    for msg in &messages {
+                                        let user_id = format!("{}", msg.author.len());
+                                        let _ = app.image_renderer.load_avatar(&user_id).await;
+                                    }
+                                }
+                                
                                 app.message_cache.insert(channel_id.clone(), messages);
                             }
                         }
@@ -164,8 +172,8 @@ async fn run_app(
                     app.loading_messages = false;
                 }
             }
-            
-            terminal.draw(|f| ui::draw(f, &app))?;
+
+            terminal.draw(|f| ui::draw(f, &mut app))?;
         }
 
         if event::poll(std::time::Duration::from_millis(100))? {

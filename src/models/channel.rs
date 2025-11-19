@@ -23,7 +23,7 @@ impl Channel {
     pub fn prefix(&self) -> &str {
         match self.kind {
             ChannelType::Text => "# ",
-            ChannelType::Voice => "🔊 ",
+            ChannelType::Voice => "v ",
         }
     }
 }

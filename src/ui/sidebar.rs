@@ -20,7 +20,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
                     format!("{}Direct Messages", arrow)
                 }
                 SidebarItem::DmChannel(dm) => {
-                    format!("  💬 {}", dm.display_name())
+                    format!("  # {}", dm.display_name())
                 }
                 SidebarItem::ServerSection => {
                     "▼ Servers".to_string()

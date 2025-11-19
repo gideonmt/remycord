@@ -6,8 +6,9 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Wrap},
     Frame,
 };
+use ratatui_image::StatefulImage;
 
-pub fn draw(f: &mut Frame, app: &App, area: Rect) {
+pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let input_lines = app.input.lines().count().max(1).min(app.config.general.max_input_lines);
     let input_height = (input_lines + 2) as u16;
 
@@ -36,8 +37,9 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(header, area);
 }
 
-fn draw_messages_area(f: &mut Frame, app: &App, area: Rect) {
+fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme();
+    let show_avatars = app.config.images.enabled && app.config.images.render_avatars;
     
     let mut typing_line = Vec::new();
     if app.config.general.show_typing_indicators && !app.typing_users.is_empty() {
@@ -52,41 +54,103 @@ fn draw_messages_area(f: &mut Frame, app: &App, area: Rect) {
         typing_line.push(Line::from(""));
     }
 
-    let mut messages_text: Vec<Line> = app
+    let avatar_width = if show_avatars { 5 } else { 0 };
+    let messages_inner = Block::default()
+        .borders(Borders::ALL)
+        .title("Messages")
+        .border_style(Style::default().fg(theme.get_color("base03")))
+        .inner(area);
+
+    // Collect theme colors we'll need
+    let author_color = theme.get_color("base0E");
+    let time_color = theme.get_color("base03");
+    let text_color = theme.get_color("base05");
+    let border_color = theme.get_color("base03");
+
+    // Draw messages
+    let mut current_y = messages_inner.y;
+    let messages_to_show = app
         .messages
         .iter()
         .skip(app.message_scroll)
-        .flat_map(|msg| {
-            let author_style = Style::default()
-                .fg(theme.get_color("base0E"))
-                .add_modifier(Modifier::BOLD);
-            let time_style = Style::default().fg(theme.get_color("base03"));
+        .take_while(|_| current_y < messages_inner.bottom())
+        .collect::<Vec<_>>();
+
+    for msg in messages_to_show {
+        if current_y >= messages_inner.bottom() {
+            break;
+        }
+
+        let msg_chunks = if show_avatars {
+            Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Length(avatar_width),
+                    Constraint::Min(0),
+                ])
+                .split(Rect {
+                    x: messages_inner.x,
+                    y: current_y,
+                    width: messages_inner.width,
+                    height: 4.min(messages_inner.bottom() - current_y),
+                })
+                .to_vec()
+        } else {
+            vec![Rect {
+                x: messages_inner.x,
+                y: current_y,
+                width: messages_inner.width,
+                height: 4.min(messages_inner.bottom() - current_y),
+            }]
+        };
+
+        if show_avatars {
+            let user_id = format!("{}", msg.author.len());
             
-            let mut header_spans = vec![];
-            if app.config.general.show_timestamps {
-                header_spans.push(Span::styled(format!("[{}] ", msg.timestamp), time_style));
+            if let Some(avatar_protocol) = app.image_renderer.get_avatar(&user_id) {
+                let image = StatefulImage::default();
+                f.render_stateful_widget(image, msg_chunks[0], avatar_protocol);
             }
-            header_spans.push(Span::styled(&msg.author, author_style));
-            
-            let header = Line::from(header_spans);
+        }
 
-            let mut lines = vec![header];
-            
-            for line in msg.content.lines() {
-                lines.push(Line::from(Span::styled(format!("  {}", line), Style::default().fg(theme.get_color("base05")))));
-            }
-            
-            lines.push(Line::from(""));
-            lines
-        })
-        .collect();
+        // Draw message content
+        let message_area = if show_avatars { msg_chunks[1] } else { msg_chunks[0] };
+        
+        let author_style = Style::default()
+            .fg(author_color)
+            .add_modifier(Modifier::BOLD);
+        let time_style = Style::default().fg(time_color);
+        
+        let mut header_spans = vec![];
+        if app.config.general.show_timestamps {
+            header_spans.push(Span::styled(format!("[{}] ", msg.timestamp), time_style));
+        }
+        header_spans.push(Span::styled(&msg.author, author_style));
+        
+        let mut message_lines = vec![Line::from(header_spans)];
+        
+        for line in msg.content.lines() {
+            message_lines.push(Line::from(Span::styled(
+                line.to_string(),
+                Style::default().fg(text_color)
+            )));
+        }
+        
+        message_lines.push(Line::from(""));
+        
+        let message_para = Paragraph::new(message_lines)
+            .wrap(Wrap { trim: false });
+        
+        f.render_widget(message_para, message_area);
+        
+        current_y += 4;
+    }
 
-    messages_text.extend(typing_line);
-
-    let messages = Paragraph::new(messages_text)
-        .block(Block::default().borders(Borders::ALL).title("Messages").border_style(Style::default().fg(theme.get_color("base03"))))
-        .wrap(Wrap { trim: false });
-    f.render_widget(messages, area);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Messages")
+        .border_style(Style::default().fg(border_color));
+    f.render_widget(block, area);
 }
 
 fn draw_input(f: &mut Frame, app: &App, area: Rect) {
