@@ -107,6 +107,33 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
         DiscordEvent::Connected(username) => {
             app.add_notification(Notification::success(format!("Connected as {}", username)));
         }
+        DiscordEvent::NewMessage(msg) => {
+            if Some(&msg.channel_id) == app.selected_channel.as_ref() {
+                if app.config.images.enabled && app.config.images.render_avatars {
+                    let _ = app.image_renderer.load_avatar(
+                        &msg.author_id,
+                        msg.author_avatar.as_deref()
+                    ).await;
+                }
+                
+                if app.config.images.enabled && app.config.images.render_attachments {
+                    for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
+                        let _ = app.image_renderer.load_attachment(
+                            &attachment.id,
+                            &attachment.url,
+                            app.config.images.max_image_width,
+                            app.config.images.max_image_height,
+                        ).await;
+                    }
+                }
+                
+                app.messages.push(msg.clone());
+            }
+            
+            if let Some(messages) = app.message_cache.get_mut(&msg.channel_id) {
+                messages.push(msg);
+            }
+        }
         _ => {}
     }
 }
@@ -160,12 +187,22 @@ async fn run_app(
                                 
                                 if app.config.images.enabled && app.config.images.render_avatars {
                                     for msg in &messages {
-                                        let user_id = format!("{}", msg.author.len());
                                         let user_id = &msg.author_id;
-                                        let avatar_hash = &msg.author_avatar;
-
-                                        //let avatar_hash = format!("{}", msg.author.avatar);
-                                        let _ = app.image_renderer.load_avatar(user_id, avatar_hash.as_deref()).await;
+                                        let avatar_hash = msg.author_avatar.as_deref();
+                                        let _ = app.image_renderer.load_avatar(user_id, avatar_hash).await;
+                                    }
+                                }
+                                
+                                if app.config.images.enabled && app.config.images.render_attachments {
+                                    let max_w = app.config.images.max_image_width;
+                                    let max_h = app.config.images.max_image_height;
+                                    
+                                    for msg in &messages {
+                                        for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
+                                            let _ = app.image_renderer
+                                                .load_attachment(&attachment.id, &attachment.url, max_w, max_h)
+                                                .await;
+                                        }
                                     }
                                 }
                                 

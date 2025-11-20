@@ -98,8 +98,4 @@ impl App {
     pub fn set_discord_client(&mut self, client: DiscordClient) {
         self.discord_client = Some(Arc::new(Mutex::new(client)));
     }
-
-    pub fn images_supported(&self) -> bool {
-        self.config.images.enabled && self.image_renderer.is_supported()
-    }
 }

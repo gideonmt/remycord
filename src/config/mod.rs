@@ -39,6 +39,18 @@ pub struct ImageSettings {
     pub render_server_icons: bool,
     pub max_image_width: u16,
     pub max_image_height: u16,
+    pub aspect_ratio_correction: f32,
+    pub auto_load_images: bool,
+    pub cache_images_disk: bool,
+    pub max_cache_size_mb: usize,
+    pub image_quality: ImageQuality,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ImageQuality {
+    Low,
+    Medium,
+    High,
 }
 
 impl Default for Config {
@@ -79,8 +91,23 @@ impl Default for ImageSettings {
             render_stickers: true,
             render_attachments: true,
             render_server_icons: true,
-            max_image_width: 30,
-            max_image_height: 15,
+            max_image_width: 40,
+            max_image_height: 20,
+            aspect_ratio_correction: 2.0,
+            auto_load_images: true,
+            cache_images_disk: true,
+            max_cache_size_mb: 100,
+            image_quality: ImageQuality::High,
+        }
+    }
+}
+
+impl ImageQuality {
+    pub fn to_filter_type(&self) -> image::imageops::FilterType {
+        match self {
+            ImageQuality::Low => image::imageops::FilterType::Nearest,
+            ImageQuality::Medium => image::imageops::FilterType::Triangle,
+            ImageQuality::High => image::imageops::FilterType::Lanczos3,
         }
     }
 }
