@@ -66,12 +66,6 @@ impl DiscordClient {
         Ok(())
     }
     
-    pub async fn fetch_guilds(&self) -> Result<Vec<AppGuild>> {
-        let guilds = self.http.get_guilds(None, None).await?;
-        
-        Ok(guilds.into_iter().map(|g| AppGuild::new(g.id.to_string(), g.name)).collect())
-    }
-    
     pub async fn fetch_dms(&self) -> Result<Vec<AppDmChannel>> {
         let channels = self.http.get_user_dm_channels().await?;
         
