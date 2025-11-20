@@ -3,3 +3,5 @@
 # rust
 debug
 target
+
+*.log
