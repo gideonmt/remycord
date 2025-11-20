@@ -9,6 +9,7 @@ use crate::models::{
     Channel as AppChannel, 
     ChannelType, 
     Message as AppMessage,
+    MessageAttachment as AppAttachment,
     DmChannel as AppDmChannel,
     DmUser,
 };
@@ -130,13 +131,29 @@ impl DiscordClient {
             .into_iter()
             .map(|m| {
                 let timestamp = m.timestamp.format("%H:%M:%S").to_string();
+                
+                let attachments: Vec<AppAttachment> = m.attachments
+                    .into_iter()
+                    .map(|a| AppAttachment::new(
+                        a.id.to_string(),
+                        a.filename,
+                        a.url,
+                        a.proxy_url,
+                        a.width,
+                        a.height,
+                        a.content_type,
+                    ))
+                    .collect();
+                
                 AppMessage::new(
                     m.id.to_string(),
                     channel_id.to_string(),
                     m.author.name,
+                    m.author.id.to_string(),
+                    m.author.avatar.map(|h| h.to_string()),
                     m.content,
                     timestamp,
-                )
+                ).with_attachments(attachments)
             })
             .collect();
         
@@ -154,6 +171,8 @@ impl DiscordClient {
             message.id.to_string(),
             channel_id.to_string(),
             message.author.name,
+            message.author.id.to_string(),
+            message.author.avatar.map(|h| h.to_string()),
             message.content,
             timestamp,
         ))
@@ -187,13 +206,29 @@ impl EventHandler for Handler {
     
     async fn message(&self, _ctx: Context, new_message: serenity::model::channel::Message) {
         let timestamp = new_message.timestamp.format("%H:%M:%S").to_string();
+        
+        let attachments: Vec<AppAttachment> = new_message.attachments
+            .into_iter()
+            .map(|a| AppAttachment::new(
+                a.id.to_string(),
+                a.filename,
+                a.url,
+                a.proxy_url,
+                a.width,
+                a.height,
+                a.content_type,
+            ))
+            .collect();
+        
         let app_message = AppMessage::new(
             new_message.id.to_string(),
             new_message.channel_id.to_string(),
             new_message.author.name,
+            new_message.author.id.to_string(),
+            new_message.author.avatar.map(|h| h.to_string()),
             new_message.content,
             timestamp,
-        );
+        ).with_attachments(attachments);
         
         let _ = self.event_tx.send(DiscordEvent::NewMessage(app_message));
     }

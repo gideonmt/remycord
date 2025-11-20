@@ -161,7 +161,11 @@ async fn run_app(
                                 if app.config.images.enabled && app.config.images.render_avatars {
                                     for msg in &messages {
                                         let user_id = format!("{}", msg.author.len());
-                                        let _ = app.image_renderer.load_avatar(&user_id).await;
+                                        let user_id = &msg.author_id;
+                                        let avatar_hash = &msg.author_avatar;
+
+                                        //let avatar_hash = format!("{}", msg.author.avatar);
+                                        let _ = app.image_renderer.load_avatar(user_id, avatar_hash.as_deref()).await;
                                     }
                                 }
                                 

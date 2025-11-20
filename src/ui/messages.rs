@@ -40,6 +40,7 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
 fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme();
     let show_avatars = app.config.images.enabled && app.config.images.render_avatars;
+    let show_attachments = app.config.images.enabled && app.config.images.render_attachments;
     
     let mut typing_line = Vec::new();
     if app.config.general.show_typing_indicators && !app.typing_users.is_empty() {
@@ -66,6 +67,7 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
     let time_color = theme.get_color("base03");
     let text_color = theme.get_color("base05");
     let border_color = theme.get_color("base03");
+    let attachment_color = theme.get_color("base0C");
 
     // Draw messages
     let mut current_y = messages_inner.y;
@@ -81,6 +83,23 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             break;
         }
 
+        // Calculate height needed for this message
+        let content_lines = msg.content.lines().count().max(1);
+        let has_images = show_attachments && msg.has_images();
+        let image_count = if has_images {
+            msg.attachments.iter().filter(|a| a.is_image()).count()
+        } else {
+            0
+        };
+        
+        let base_height = 2 + content_lines;
+        let image_height = if image_count > 0 {
+            (app.config.images.max_image_height + 1) * image_count as u16
+        } else {
+            0
+        };
+        let msg_height = (base_height as u16 + image_height).min(messages_inner.bottom() - current_y);
+
         let msg_chunks = if show_avatars {
             Layout::default()
                 .direction(Direction::Horizontal)
@@ -92,7 +111,7 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
                     x: messages_inner.x,
                     y: current_y,
                     width: messages_inner.width,
-                    height: 4.min(messages_inner.bottom() - current_y),
+                    height: msg_height,
                 })
                 .to_vec()
         } else {
@@ -100,16 +119,21 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
                 x: messages_inner.x,
                 y: current_y,
                 width: messages_inner.width,
-                height: 4.min(messages_inner.bottom() - current_y),
+                height: msg_height,
             }]
         };
 
+        // Draw avatar
         if show_avatars {
-            let user_id = format!("{}", msg.author.len());
-            
-            if let Some(avatar_protocol) = app.image_renderer.get_avatar(&user_id) {
+            if let Some(avatar_protocol) = app.image_renderer.get_avatar(&msg.author_id) {
                 let image = StatefulImage::default();
-                f.render_stateful_widget(image, msg_chunks[0], avatar_protocol);
+                let avatar_area = Rect {
+                    x: msg_chunks[0].x,
+                    y: msg_chunks[0].y,
+                    width: msg_chunks[0].width,
+                    height: 4.min(msg_chunks[0].height),
+                };
+                f.render_stateful_widget(image, avatar_area, avatar_protocol);
             }
         }
 
@@ -136,14 +160,72 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             )));
         }
         
+        // Add attachment indicators
+        if !msg.attachments.is_empty() {
+            message_lines.push(Line::from(""));
+            for attachment in &msg.attachments {
+                if attachment.is_image() {
+                    if show_attachments {
+                        message_lines.push(Line::from(Span::styled(
+                            format!("📎 {}", attachment.filename),
+                            Style::default().fg(attachment_color)
+                        )));
+                    } else {
+                        message_lines.push(Line::from(Span::styled(
+                            format!("🖼️  {} (images disabled)", attachment.filename),
+                            Style::default().fg(attachment_color)
+                        )));
+                    }
+                } else {
+                    message_lines.push(Line::from(Span::styled(
+                        format!("📎 {}", attachment.filename),
+                        Style::default().fg(attachment_color)
+                    )));
+                }
+            }
+        }
+        
         message_lines.push(Line::from(""));
+        
+        let text_height = message_lines.len() as u16;
+        let text_area = Rect {
+            x: message_area.x,
+            y: message_area.y,
+            width: message_area.width,
+            height: text_height.min(message_area.height),
+        };
         
         let message_para = Paragraph::new(message_lines)
             .wrap(Wrap { trim: false });
         
-        f.render_widget(message_para, message_area);
+        f.render_widget(message_para, text_area);
         
-        current_y += 4;
+        // Draw image attachments
+        if show_attachments && has_images {
+            let mut image_y = text_area.y + text_height;
+            
+            for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
+                if image_y >= message_area.bottom() {
+                    break;
+                }
+                
+                if let Some(image_protocol) = app.image_renderer.get_attachment(&attachment.id) {
+                    let image_area = Rect {
+                        x: message_area.x,
+                        y: image_y,
+                        width: app.config.images.max_image_width.min(message_area.width),
+                        height: app.config.images.max_image_height.min(message_area.bottom() - image_y),
+                    };
+                    
+                    let image = StatefulImage::default();
+                    f.render_stateful_widget(image, image_area, image_protocol);
+                    
+                    image_y += image_area.height + 1;
+                }
+            }
+        }
+        
+        current_y += msg_height;
     }
 
     let block = Block::default()

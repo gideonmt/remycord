@@ -7,7 +7,7 @@ mod notification;
 
 pub use guild::Guild;
 pub use channel::{Channel, ChannelType};
-pub use message::Message;
+pub use message::{Message, MessageAttachment};
 pub use file::AttachedFile;
 pub use dm::{DmChannel, DmUser};
 pub use notification::Notification;

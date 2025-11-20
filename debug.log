@@ -1,0 +1,244 @@
+warning: unused variable: `user_id`
+   --> src/main.rs:163:45
+    |
+163 | ...                   let user_id = format!("{}", msg.author.len());
+    |                           ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_user_id`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `images_supported` is never used
+   --> src/app/mod.rs:102:12
+    |
+ 41 | impl App {
+    | -------- method in this implementation
+...
+102 |     pub fn images_supported(&self) -> bool {
+    |            ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `get_image_cache_dir` is never used
+   --> src/config/mod.rs:107:8
+    |
+107 | pub fn get_image_cache_dir() -> Result<PathBuf> {
+    |        ^^^^^^^^^^^^^^^^^^^
+
+warning: methods `load_attachment`, `clear_cache`, `clear_avatar_cache`, `clear_attachment_cache`, `load_image`, and `load_dynamic_image` are never used
+   --> src/ui/image.rs:76:18
+    |
+ 13 | impl ImageRenderer {
+    | ------------------ methods in this implementation
+...
+ 76 |     pub async fn load_attachment(
+    |                  ^^^^^^^^^^^^^^^
+...
+128 |     pub fn clear_cache(&mut self) {
+    |            ^^^^^^^^^^^
+...
+134 |     pub fn clear_avatar_cache(&mut self) {
+    |            ^^^^^^^^^^^^^^^^^^
+...
+139 |     pub fn clear_attachment_cache(&mut self) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^
+...
+144 |     pub fn load_image(&mut self, bytes: &[u8]) -> Result<StatefulProtocol> {
+    |            ^^^^^^^^^^
+...
+151 |     pub fn load_dynamic_image(&mut self, img: DynamicImage) -> StatefulProtocol {
+    |            ^^^^^^^^^^^^^^^^^^
+
+warning: fields `id` and `channel_id` are never read
+ --> src/models/message.rs:3:9
+  |
+2 | pub struct Message {
+  |            ------- fields in this struct
+3 |     pub id: String,
+  |         ^^
+4 |     pub channel_id: String,
+  |         ^^^^^^^^^^
+  |
+  = note: `Message` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `url`, `proxy_url`, `width`, and `height` are never read
+  --> src/models/message.rs:17:9
+   |
+14 | pub struct MessageAttachment {
+   |            ----------------- fields in this struct
+...
+17 |     pub url: String,
+   |         ^^^
+18 |     pub proxy_url: String,
+   |         ^^^^^^^^^
+19 |     pub width: Option<u32>,
+   |         ^^^^^
+20 |     pub height: Option<u32>,
+   |         ^^^^^^
+   |
+   = note: `MessageAttachment` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `path` and `name` are never read
+ --> src/models/file.rs:3:9
+  |
+2 | pub struct AttachedFile {
+  |            ------------ fields in this struct
+3 |     pub path: String,
+  |         ^^^^
+4 |     pub name: String,
+  |         ^^^^
+  |
+  = note: `AttachedFile` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `id` is never read
+ --> src/models/dm.rs:9:9
+  |
+8 | pub struct DmUser {
+  |            ------ field in this struct
+9 |     pub id: String,
+  |         ^^
+  |
+  = note: `DmUser` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `message` and `kind` are never read
+ --> src/models/notification.rs:5:9
+  |
+4 | pub struct Notification {
+  |            ------------ fields in this struct
+5 |     pub message: String,
+  |         ^^^^^^^
+...
+8 |     pub kind: NotificationKind,
+  |         ^^^^
+  |
+  = note: `Notification` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: variants `Info`, `Warning`, and `Error` are never constructed
+  --> src/models/notification.rs:13:5
+   |
+12 | pub enum NotificationKind {
+   |          ---------------- variants in this enum
+13 |     Info,
+   |     ^^^^
+14 |     Success,
+15 |     Warning,
+   |     ^^^^^^^
+16 |     Error,
+   |     ^^^^^
+   |
+   = note: `NotificationKind` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: associated items `info`, `warning`, `error`, `with_duration`, and `remaining_progress` are never used
+  --> src/models/notification.rs:29:12
+   |
+19 | impl Notification {
+   | ----------------- associated items in this implementation
+...
+29 |     pub fn info(message: impl Into<String>) -> Self {
+   |            ^^^^
+...
+37 |     pub fn warning(message: impl Into<String>) -> Self {
+   |            ^^^^^^^
+...
+41 |     pub fn error(message: impl Into<String>) -> Self {
+   |            ^^^^^
+...
+45 |     pub fn with_duration(mut self, duration: Duration) -> Self {
+   |            ^^^^^^^^^^^^^
+...
+54 |     pub fn remaining_progress(&self) -> f32 {
+   |            ^^^^^^^^^^^^^^^^^^
+
+warning: struct `Handler` is never constructed
+ --> src/discord/client.rs:6:8
+  |
+6 | struct Handler;
+  |        ^^^^^^^
+
+warning: function `connect_and_verify` is never used
+  --> src/discord/client.rs:15:14
+   |
+15 | pub async fn connect_and_verify(token: &str) -> Result<String> {
+   |              ^^^^^^^^^^^^^^^^^^
+
+warning: field `0` is never read
+  --> src/discord/api.rs:24:16
+   |
+24 |     NewMessage(AppMessage),
+   |     ---------- ^^^^^^^^^^
+   |     |
+   |     field in this variant
+   |
+   = note: `DiscordEvent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+   |
+24 -     NewMessage(AppMessage),
+24 +     NewMessage(()),
+   |
+
+warning: variants `DmChannels`, `GuildChannels`, `Messages`, and `Error` are never constructed
+  --> src/discord/api.rs:21:5
+   |
+18 | pub enum DiscordEvent {
+   |          ------------ variants in this enum
+...
+21 |     DmChannels(Vec<AppDmChannel>),
+   |     ^^^^^^^^^^
+22 |     GuildChannels(String, Vec<AppChannel>),
+   |     ^^^^^^^^^^^^^
+23 |     Messages(String, Vec<AppMessage>),
+   |     ^^^^^^^^
+24 |     NewMessage(AppMessage),
+25 |     Error(String),
+   |     ^^^^^
+   |
+   = note: `DiscordEvent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: method `fetch_guilds` is never used
+  --> src/discord/api.rs:69:18
+   |
+33 | impl DiscordClient {
+   | ------------------ method in this implementation
+...
+69 |     pub async fn fetch_guilds(&self) -> Result<Vec<AppGuild>> {
+   |                  ^^^^^^^^^^^^
+
+warning: structure field `base0A` should have a snake case name
+  --> src/config/theme.rs:22:9
+   |
+22 |     pub base0A: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_a`
+   |
+   = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: structure field `base0B` should have a snake case name
+  --> src/config/theme.rs:23:9
+   |
+23 |     pub base0B: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_b`
+
+warning: structure field `base0C` should have a snake case name
+  --> src/config/theme.rs:24:9
+   |
+24 |     pub base0C: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_c`
+
+warning: structure field `base0D` should have a snake case name
+  --> src/config/theme.rs:25:9
+   |
+25 |     pub base0D: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_d`
+
+warning: structure field `base0E` should have a snake case name
+  --> src/config/theme.rs:26:9
+   |
+26 |     pub base0E: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_e`
+
+warning: structure field `base0F` should have a snake case name
+  --> src/config/theme.rs:27:9
+   |
+27 |     pub base0F: String,
+   |         ^^^^^^ help: convert the identifier to snake case: `base0_f`
+
+warning: `remycord` (bin "remycord") generated 22 warnings
+    Finished `release` profile [optimized] target(s) in 0.53s
+     Running `target/release/remycord`
