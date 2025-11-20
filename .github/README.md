@@ -4,32 +4,79 @@ very work in progress discord tui made with ratatui
 
 ### todo
 
-- [ ] improve loading/channel and dms esp
-- [ ] reactions
-- [ ] notifications for messages
-- [ ] voice channels
-- [ ] forum channels
-- [ ] threads
-- [ ] fix attachments
-- [ ] render images
-  - [ ] custom emojis
-  - [ ] gif support
-  - [x] avatars
-  - [ ] stickers
-  - [ ] image attachments
-- [ ] render message embeds? (how?)
-- [ ] improve settings page
-  - [ ] add settings about appearance
-  - [ ] add settings about notifications
-  - [x] rendering images
-  - [ ] rendering new/advanced markdown (headings etc)
-  - [ ] better keybinding configuration
-  - [ ] more default themes
-- [ ] ui improvements
-  - [ ] dms should look like a server with channels inside
-  - [ ] loading screen
-  - [ ] channels in folders and sorted how i have them set up on discord
-  - [ ] clearer base16 color usage
-  - [ ] role colors (disablable in settings)
-- [ ] better message input (multiline, history, autocomplete mentions/emojis)
-- [ ] slash commands
+
+- [ ] Core loading and state
+  - [ ] Correct channel loading
+  - [ ] Correct DM loading
+  - [ ] DM creation and switching
+  - [ ] Attachment state correctness during load
+- [ ] Message features
+  - [ ] Reactions (add/remove)
+  - [ ] Reaction summaries
+  - [ ] Message notifications
+  - [ ] Threads
+  - [ ] Forum channels
+  - [ ] Message reference rendering
+  - [ ] Crosspost indicators
+  - [ ] Pinned messages UI
+- [ ] Voice
+  - [ ] Join/leave
+  - [ ] Audio receive
+  - [ ] Audio send
+  - [ ] Mute/deafen controls
+  - [ ] Connection state display
+- [ ] Embeds
+  - [ ] Title, description, fields
+  - [ ] Thumbnails and images
+  - [ ] Footers and timestamps
+  - [ ] Color bars
+- [ ] Images and media
+  - [ ] Fix attachment loading
+  - [ ] Image rendering
+    - [ ] Custom emojis
+    - [ ] GIF decoding
+    - [x] Avatars
+    - [ ] Stickers
+    - [x] Image attachments
+  - [ ] Video attachment metadata display
+  - [ ] Spoiler image handling
+- [ ] Markdown and formatting
+  - [ ] Headings
+  - [ ] Lists
+  - [ ] Code blocks
+  - [ ] Inline formatting
+  - [ ] Mentions
+  - [ ] Emoji autocomplete
+  - [ ] Link formatting
+  - [ ] Spoilers
+- [ ] UI improvements
+  - [ ] DM layout structured like a server
+  - [ ] Loading screen
+  - [ ] Channel folders and sorting matching Discord
+  - [ ] Base16 color usage clarity
+  - [ ] Role colors (toggleable)
+  - [ ] Multiple default themes
+  - [ ] Better message list performance
+- [ ] Settings
+  - [ ] Appearance
+  - [ ] Notifications
+  - [x] Image rendering
+  - [ ] Advanced markdown settings
+  - [ ] Keybinding configuration
+  - [ ] Theme selection
+- [ ] Input and interaction
+  - [ ] Multiline input
+  - [ ] Input history
+  - [ ] Mention autocomplete
+  - [ ] Emoji autocomplete
+  - [ ] Slash command parsing and suggestions
+- [ ] More Discord stuff
+  - [ ] Server boosts indicator
+  - [ ] Permissions viewer
+  - [ ] Audit log viewer
+  - [ ] Channel topic rendering
+  - [ ] Slowmode indicator
+  - [ ] Nitro badge rendering
+  - [ ] Server discovery UI
+  - [ ] Stage channels
+  - [ ] Scheduled events display
