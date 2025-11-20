@@ -296,51 +296,6 @@ impl ImageRenderer {
     pub fn get_attachment(&mut self, attachment_id: &str) -> Option<&mut StatefulProtocol> {
         self.attachment_cache.get_mut(attachment_id).map(|cached| &mut cached.protocol)
     }
-
-    /// Get original dimensions of cached attachment
-    pub fn get_attachment_dimensions(&self, attachment_id: &str) -> Option<(u32, u32)> {
-        self.attachment_cache.get(attachment_id).map(|cached| {
-            (cached.original_width, cached.original_height)
-        })
-    }
-
-    /// Clear all caches
-    pub fn clear_cache(&mut self) {
-        self.avatar_cache.clear();
-        self.attachment_cache.clear();
-    }
-
-    /// Clear only avatar cache
-    pub fn clear_avatar_cache(&mut self) {
-        self.avatar_cache.clear();
-    }
-
-    /// Clear only attachment cache
-    pub fn clear_attachment_cache(&mut self) {
-        self.attachment_cache.clear();
-    }
-
-    /// Clear disk cache
-    pub async fn clear_disk_cache() -> Result<()> {
-        let cache_dir = Self::get_cache_dir()?;
-        if cache_dir.exists() {
-            fs::remove_dir_all(&cache_dir).await?;
-            fs::create_dir_all(&cache_dir).await?;
-        }
-        Ok(())
-    }
-
-    /// Load an image from bytes
-    pub fn load_image(&mut self, bytes: &[u8]) -> Result<StatefulProtocol> {
-        let img = image::load_from_memory(bytes)?;
-        let protocol = self.picker.new_resize_protocol(img);
-        Ok(protocol)
-    }
-
-    /// Load an image from a DynamicImage
-    pub fn load_dynamic_image(&mut self, img: DynamicImage) -> StatefulProtocol {
-        self.picker.new_resize_protocol(img)
-    }
 }
 
 impl Default for ImageRenderer {
