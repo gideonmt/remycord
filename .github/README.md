@@ -4,6 +4,7 @@ very work in progress discord tui made with ratatui
 
 ### todo
 
+- [ ] improve loading/channel and dms esp
 - [ ] reactions
 - [ ] notifications for messages
 - [ ] voice channels
@@ -13,14 +14,14 @@ very work in progress discord tui made with ratatui
 - [ ] render images
   - [ ] custom emojis
   - [ ] gif support
-  - [ ] avatars
+  - [x] avatars
   - [ ] stickers
   - [ ] image attachments
 - [ ] render message embeds? (how?)
 - [ ] improve settings page
   - [ ] add settings about appearance
   - [ ] add settings about notifications
-  - [ ] rendering images
+  - [x] rendering images
   - [ ] rendering new/advanced markdown (headings etc)
   - [ ] better keybinding configuration
   - [ ] more default themes
