@@ -183,7 +183,7 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         
         // Add attachment indicators with better formatting
         if !msg.attachments.is_empty() {
-            for (idx, attachment) in msg.attachments.iter().enumerate() {
+            for (_idx, attachment) in msg.attachments.iter().enumerate() {
                 if attachment.is_image() {
                     if show_attachments {
                         // Show dimensions if available
