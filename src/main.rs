@@ -155,24 +155,66 @@ async fn run_app(
                     if let Ok(dms) = client.fetch_dms().await {
                         drop(client);
                         app.dms = dms;
+                        let dm_count = app.dms.len();
+                        let msg = format!("Loaded {} DM channel(s)", dm_count);
+                        app.add_notification(Notification::success(msg));
+                    } else {
+                        app.add_notification(Notification::error("Failed to load DMs"));
                     }
                 }
                 app.loading_dms = false;
             }
             
             if app.loading_channels {
-                if let Some(guild) = app.guilds.iter().find(|g| g.expanded && !app.channel_cache.contains_key(&g.id)) {
-                    let guild_id = guild.id.clone();
+                let guilds_to_load: Vec<String> = app
+                    .guilds
+                    .iter()
+                    .filter(|g| g.expanded && !app.channel_cache.contains_key(&g.id))
+                    .map(|g| g.id.clone())
+                    .collect();
+
+                for guild_id in guilds_to_load {
                     let client_arc = app.discord_client.clone();
                     if let Some(client_arc) = client_arc {
                         let client = client_arc.lock().await;
-                        if let Ok(channels) = client.fetch_channels(&guild_id).await {
-                            drop(client);
-                            app.channel_cache.insert(guild_id, channels);
+                        
+                        match client.fetch_channels(&guild_id).await {
+                            Ok(channel_list) => {
+                                let num_channels = channel_list.channels.len();
+                                let num_categories = channel_list.categories.len();
+                                
+                                drop(client);
+                                
+                                app.channel_cache.insert(guild_id.clone(), channel_list);
+
+                                if let Some(guild) = app.guilds.iter().find(|g| g.id == guild_id) {
+                                    let guild_name = guild.name.clone();
+                                    let label = if num_categories == 1 { "y" } else { "ies" };
+                                    let msg = format!(
+                                        "Loaded {} for {}: {} channel(s), {} categor{}",
+                                        "channels",
+                                        guild_name,
+                                        num_channels,
+                                        num_categories,
+                                        label
+                                    );
+                                    app.add_notification(Notification::success(msg));
+                                }
+                            }
+                            Err(e) => {
+                                drop(client);
+                                
+                                if let Some(guild) = app.guilds.iter().find(|g| g.id == guild_id) {
+                                    let guild_name = guild.name.clone();
+                                    let msg = format!("Failed to load channels for {}: {}", guild_name, e);
+                                    app.add_notification(Notification::error(msg));
+                                }
+                            }
                         }
                     }
-                    app.loading_channels = false;
                 }
+                
+                app.loading_channels = false;
             }
             
             if app.loading_messages {
@@ -181,32 +223,42 @@ async fn run_app(
                         let client_arc = app.discord_client.clone();
                         if let Some(client_arc) = client_arc {
                             let client = client_arc.lock().await;
-                            if let Ok(messages) = client.fetch_messages(channel_id, 50).await {
-                                drop(client);
-                                app.messages = messages.clone();
-                                
-                                if app.config.images.enabled && app.config.images.render_avatars {
-                                    for msg in &messages {
-                                        let user_id = &msg.author_id;
-                                        let avatar_hash = msg.author_avatar.as_deref();
-                                        let _ = app.image_renderer.load_avatar(user_id, avatar_hash).await;
-                                    }
-                                }
-                                
-                                if app.config.images.enabled && app.config.images.render_attachments {
-                                    let max_w = app.config.images.max_image_width;
-                                    let max_h = app.config.images.max_image_height;
+                            
+                            match client.fetch_messages(channel_id, 50).await {
+                                Ok(messages) => {
+                                    drop(client);
                                     
-                                    for msg in &messages {
-                                        for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
-                                            let _ = app.image_renderer
-                                                .load_attachment(&attachment.id, &attachment.url, max_w, max_h)
-                                                .await;
+                                    app.messages = messages.clone();
+                                    
+                                    if app.config.images.enabled && app.config.images.render_avatars {
+                                        for msg in &messages {
+                                            let user_id = &msg.author_id;
+                                            let avatar_hash = msg.author_avatar.as_deref();
+                                            let _ = app.image_renderer.load_avatar(user_id, avatar_hash).await;
                                         }
                                     }
+                                    
+                                    if app.config.images.enabled && app.config.images.render_attachments {
+                                        let max_w = app.config.images.max_image_width;
+                                        let max_h = app.config.images.max_image_height;
+                                        
+                                        for msg in &messages {
+                                            for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
+                                                let _ = app.image_renderer
+                                                    .load_attachment(&attachment.id, &attachment.url, max_w, max_h)
+                                                    .await;
+                                            }
+                                        }
+                                    }
+                                    
+                                    app.message_cache.insert(channel_id.clone(), messages);
                                 }
-                                
-                                app.message_cache.insert(channel_id.clone(), messages);
+                                Err(e) => {
+                                    drop(client);
+                                    app.add_notification(Notification::error(
+                                        format!("Failed to load messages: {}", e)
+                                    ));
+                                }
                             }
                         }
                     }

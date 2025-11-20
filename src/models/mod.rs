@@ -6,7 +6,7 @@ mod dm;
 mod notification;
 
 pub use guild::Guild;
-pub use channel::{Channel, ChannelType};
+pub use channel::{Channel, ChannelList, ChannelCategory, ChannelType};
 pub use message::{Message, MessageAttachment};
 pub use file::AttachedFile;
 pub use dm::{DmChannel, DmUser};

@@ -6,7 +6,9 @@ use tokio::sync::mpsc;
 
 use crate::models::{
     Guild as AppGuild, 
-    Channel as AppChannel, 
+    Channel as AppChannel,
+    ChannelList,
+    ChannelCategory,
     ChannelType, 
     Message as AppMessage,
     MessageAttachment as AppAttachment,
@@ -94,27 +96,83 @@ impl DiscordClient {
         Ok(dm_channels)
     }
     
-    pub async fn fetch_channels(&self, guild_id: &str) -> Result<Vec<AppChannel>> {
+    pub async fn fetch_channels(&self, guild_id: &str) -> Result<ChannelList> {
         let guild_id = guild_id.parse::<GuildId>()?;
         let channels = self.http.get_channels(guild_id).await?;
         
-        let mut app_channels: Vec<AppChannel> = channels
-            .into_iter()
-            .filter_map(|c| {
-                match c.kind {
-                    serenity::model::channel::ChannelType::Text => {
-                        Some(AppChannel::new(c.id.to_string(), c.name, ChannelType::Text))
-                    }
-                    serenity::model::channel::ChannelType::Voice => {
-                        Some(AppChannel::new(c.id.to_string(), c.name, ChannelType::Voice))
-                    }
-                    _ => None,
-                }
-            })
-            .collect();
+        let mut channel_list = ChannelList::new();
         
-        app_channels.sort_by_key(|c| c.name.clone());
-        Ok(app_channels)
+        for channel in channels {
+            match channel.kind {
+                serenity::model::channel::ChannelType::Category => {
+                    channel_list.categories.push(ChannelCategory::new(
+                        channel.id.to_string(),
+                        channel.name,
+                        i32::from(channel.position),
+                    ));
+                }
+                serenity::model::channel::ChannelType::Text => {
+                    let mut ch = AppChannel::new(
+                        channel.id.to_string(),
+                        channel.name,
+                        ChannelType::Text,
+                        i32::from(channel.position),
+                    );
+                    if let Some(parent) = channel.parent_id {
+                        ch = ch.with_parent(parent.to_string());
+                    }
+                    channel_list.channels.push(ch);
+                }
+                serenity::model::channel::ChannelType::Voice => {
+                    let mut ch = AppChannel::new(
+                        channel.id.to_string(),
+                        channel.name,
+                        ChannelType::Voice,
+                        i32::from(channel.position),
+                    );
+                    if let Some(parent) = channel.parent_id {
+                        ch = ch.with_parent(parent.to_string());
+                    }
+                    channel_list.channels.push(ch);
+                }
+                serenity::model::channel::ChannelType::News => {
+                    let mut ch = AppChannel::new(
+                        channel.id.to_string(),
+                        channel.name,
+                        ChannelType::Announcement,
+                        i32::from(channel.position),
+                    );
+                    if let Some(parent) = channel.parent_id {
+                        ch = ch.with_parent(parent.to_string());
+                    }
+                    channel_list.channels.push(ch);
+                }
+                serenity::model::channel::ChannelType::Stage => {
+                    let mut ch = AppChannel::new(
+                        channel.id.to_string(),
+                        channel.name,
+                        ChannelType::Stage,
+                        i32::from(channel.position),
+                    );
+                    if let Some(parent) = channel.parent_id {
+                        ch = ch.with_parent(parent.to_string());
+                    }
+                    channel_list.channels.push(ch);
+                }
+                serenity::model::channel::ChannelType::PublicThread
+                | serenity::model::channel::ChannelType::PrivateThread
+                | serenity::model::channel::ChannelType::NewsThread => {
+                    continue;
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+        
+        channel_list.sort();
+        
+        Ok(channel_list)
     }
     
     pub async fn fetch_messages(&self, channel_id: &str, limit: u8) -> Result<Vec<AppMessage>> {

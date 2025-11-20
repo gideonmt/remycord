@@ -14,45 +14,67 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, item)| {
-            let text = match item {
+            let (text, indent_level) = match item {
                 SidebarItem::DmSection => {
                     let arrow = if app.dm_section_expanded { "▼ " } else { "▶ " };
-                    format!("{}Direct Messages", arrow)
+                    (format!("{}Direct Messages", arrow), 0)
                 }
                 SidebarItem::DmChannel(dm) => {
-                    format!("  # {}", dm.display_name())
+                    (format!("  # {}", dm.display_name()), 1)
                 }
                 SidebarItem::ServerSection => {
-                    "▼ Servers".to_string()
+                    ("▼ Servers".to_string(), 0)
                 }
                 SidebarItem::Server(guild) => {
                     let arrow = if guild.expanded { "▼ " } else { "▶ " };
-                    format!("  {}{}", arrow, guild.name)
+                    (format!("  {}{}", arrow, guild.name), 1)
                 }
-                SidebarItem::Channel(channel) => {
-                    format!("    {}{}", channel.prefix(), channel.name)
+                SidebarItem::Category { category, expanded, .. } => {
+                    let arrow = if *expanded { "▼ " } else { "▶ " };
+                    (format!("    {}{}", arrow, category.name.to_uppercase()), 2)
+                }
+                SidebarItem::Channel { channel, .. } => {
+                    let indent = if channel.parent_id.is_some() {
+                        "      "
+                    } else {
+                        "    "
+                    };
+                    (format!("{}{}{}", indent, channel.prefix(), channel.name), 3)
                 }
             };
 
             let is_selected = i == app.selected_sidebar_idx;
             let is_active = match item {
-                SidebarItem::DmChannel(dm) => Some(dm.id.clone()) == app.selected_channel,
-                SidebarItem::Channel(channel) => Some(channel.id.clone()) == app.selected_channel,
+                SidebarItem::DmChannel(dm) => Some(&dm.id) == app.selected_channel.as_ref(),
+                SidebarItem::Channel { channel, .. } => {
+                    Some(&channel.id) == app.selected_channel.as_ref()
+                }
                 _ => false,
             };
 
-            let is_section = matches!(item, SidebarItem::DmSection | SidebarItem::ServerSection);
+            let is_section = matches!(
+                item,
+                SidebarItem::DmSection | SidebarItem::ServerSection
+            );
+            
+            let is_category = matches!(item, SidebarItem::Category { .. });
 
             let style = if is_section {
                 Style::default()
                     .fg(theme.get_color("base0D"))
+                    .add_modifier(Modifier::BOLD)
+            } else if is_category {
+                Style::default()
+                    .fg(theme.get_color("base04"))
                     .add_modifier(Modifier::BOLD)
             } else if is_selected && app.mode == AppMode::Sidebar {
                 Style::default()
                     .fg(theme.get_color("base0A"))
                     .add_modifier(Modifier::BOLD)
             } else if is_active {
-                Style::default().fg(theme.get_color("base0B"))
+                Style::default()
+                    .fg(theme.get_color("base0B"))
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(theme.get_color("base05"))
             };

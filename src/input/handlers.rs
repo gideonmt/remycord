@@ -5,6 +5,7 @@ use std::io;
 
 use crate::app::{App, AppMode, SidebarItem};
 use crate::config::{Keybinds, KeyBind, save_config, get_available_themes};
+use crate::models::{Notification, ChannelType};
 use super::file_picker;
 
 pub fn handle_keybind_recording(app: &mut App, key: KeyEvent, action: &str) -> Result<bool> {
@@ -178,7 +179,23 @@ fn select_sidebar_item(app: &mut App) {
                     }
                 }
             }
-            SidebarItem::Channel(channel) => {
+            SidebarItem::Category { guild_id, category, .. } => {
+                app.toggle_category(guild_id, &category.id);
+            }
+            SidebarItem::Channel { channel, .. } => {
+                if !channel.is_text_based() {
+                    app.add_notification(Notification::info(
+                        format!("Cannot view messages in {} channels", 
+                            match channel.kind {
+                                ChannelType::Voice => "voice",
+                                ChannelType::Stage => "stage",
+                                _ => "this type of",
+                            }
+                        )
+                    ));
+                    return;
+                }
+                
                 app.selected_channel = Some(channel.id.clone());
                 app.message_scroll = 0;
                 
