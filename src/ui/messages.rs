@@ -41,7 +41,14 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme();
     let show_avatars = app.config.images.enabled && app.config.images.render_avatars;
     let show_attachments = app.config.images.enabled && app.config.images.render_attachments;
-    
+
+    let author_color = theme.get_color("base0E");
+    let time_color = theme.get_color("base03");
+    let text_color = theme.get_color("base05");
+    let attachment_color = theme.get_color("base0C");
+    let dim_color = theme.get_color("base04");
+    let border_color = theme.get_color("base03");
+
     let mut typing_line = Vec::new();
     if app.config.general.show_typing_indicators && !app.typing_users.is_empty() {
         let typing_text = if app.typing_users.len() == 1 {
@@ -50,33 +57,26 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             format!("{} are typing...", app.typing_users.join(", "))
         };
         typing_line.push(Line::from(vec![
-            Span::styled(typing_text, Style::default().fg(theme.get_color("base03")).add_modifier(Modifier::ITALIC)),
+            Span::styled(typing_text, Style::default().fg(time_color).add_modifier(Modifier::ITALIC)),
         ]));
         typing_line.push(Line::from(""));
     }
 
     let avatar_width = if show_avatars { 5 } else { 0 };
+    let avatar_height = 4;
     let messages_inner = Block::default()
         .borders(Borders::ALL)
         .title("Messages")
-        .border_style(Style::default().fg(theme.get_color("base03")))
+        .border_style(Style::default().fg(border_color))
         .inner(area);
 
-    // Collect theme colors we'll need
-    let author_color = theme.get_color("base0E");
-    let time_color = theme.get_color("base03");
-    let text_color = theme.get_color("base05");
-    let border_color = theme.get_color("base03");
-    let attachment_color = theme.get_color("base0C");
-    let dim_color = theme.get_color("base04");
+    let available_image_width = messages_inner.width.saturating_sub(avatar_width + 4);
 
-    // Draw messages
     let mut current_y = messages_inner.y;
     let messages_to_show = app
         .messages
         .iter()
         .skip(app.message_scroll)
-        .take_while(|_| current_y < messages_inner.bottom())
         .collect::<Vec<_>>();
 
     for msg in messages_to_show {
@@ -84,7 +84,6 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             break;
         }
 
-        // Calculate height needed for this message
         let content_lines = if msg.content.is_empty() { 0 } else { msg.content.lines().count() };
         let has_images = show_attachments && msg.has_images();
         let image_attachments: Vec<_> = if has_images {
@@ -93,29 +92,20 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             Vec::new()
         };
         
-        // Calculate total height needed
         let header_height = 1;
-        let content_height = if content_lines > 0 { content_lines + 1 } else { 0 }; // +1 for spacing
+        let content_height = if content_lines > 0 { content_lines + 1 } else { 0 };
         let attachment_text_height = if !msg.attachments.is_empty() { 1 + msg.attachments.len() } else { 0 };
         
-        // Calculate image rendering height
-        let mut total_image_height = 0;
-        if show_attachments {
-            for attachment in &image_attachments {
-                // Calculate aspect-ratio aware dimensions
-                let (_img_width, img_height) = calculate_image_dimensions(
-                    attachment.width,
-                    attachment.height,
-                    app.config.images.max_image_width,
-                    app.config.images.max_image_height,
-                    messages_inner.width.saturating_sub(avatar_width + 4),
-                );
-                total_image_height += img_height + 1; // +1 for spacing
-            }
-        }
+        let image_height = if show_attachments && !image_attachments.is_empty() {
+            image_attachments.len() * (app.config.images.max_image_height as usize + 1)
+        } else {
+            0
+        };
         
-        let base_height = header_height + content_height + attachment_text_height;
-        let msg_height = (base_height as u16 + total_image_height).min(messages_inner.bottom() - current_y);
+        let text_total_height = header_height + content_height + attachment_text_height;
+        let total_height = text_total_height + image_height;
+        let remaining_height = messages_inner.bottom().saturating_sub(current_y);
+        let msg_height = total_height.min(remaining_height as usize) as u16;
 
         let msg_chunks = if show_avatars {
             Layout::default()
@@ -140,26 +130,22 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             }]
         };
 
-        // Draw avatar
         if show_avatars {
-            if let Some(avatar_protocol) = app.image_renderer.get_avatar(&msg.author_id) {
-                let image = StatefulImage::default();
+            if let Some(protocol) = app.image_renderer.get_avatar(&msg.author_id) {
                 let avatar_area = Rect {
                     x: msg_chunks[0].x,
                     y: msg_chunks[0].y,
                     width: msg_chunks[0].width,
-                    height: 4.min(msg_chunks[0].height),
+                    height: avatar_height.min(msg_chunks[0].height),
                 };
-                f.render_stateful_widget(image, avatar_area, avatar_protocol);
+                let image_widget = StatefulImage::default();
+                f.render_stateful_widget(image_widget, avatar_area, protocol);
             }
         }
 
-        // Draw message content
         let message_area = if show_avatars { msg_chunks[1] } else { msg_chunks[0] };
         
-        let author_style = Style::default()
-            .fg(author_color)
-            .add_modifier(Modifier::BOLD);
+        let author_style = Style::default().fg(author_color).add_modifier(Modifier::BOLD);
         let time_style = Style::default().fg(time_color);
         
         let mut header_spans = vec![];
@@ -170,49 +156,35 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         
         let mut message_lines = vec![Line::from(header_spans)];
         
-        // Add content if present
         if !msg.content.is_empty() {
             for line in msg.content.lines() {
-                message_lines.push(Line::from(Span::styled(
-                    line.to_string(),
-                    Style::default().fg(text_color)
-                )));
+                message_lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(text_color))));
             }
-            message_lines.push(Line::from("")); // Spacing after content
+            message_lines.push(Line::from(""));
         }
         
-        // Add attachment indicators with better formatting
         if !msg.attachments.is_empty() {
-            for (_idx, attachment) in msg.attachments.iter().enumerate() {
+            for attachment in msg.attachments.iter() {
                 if attachment.is_image() {
                     if show_attachments {
-                        // Show dimensions if available
-                        let dim_text = if let (Some(w), Some(h)) = (attachment.width, attachment.height) {
-                            format!(" ({}×{})", w, h)
-                        } else {
-                            String::new()
-                        };
-                        
                         message_lines.push(Line::from(vec![
-                            Span::styled("🖼️  ", Style::default().fg(attachment_color)),
+                            Span::styled("i  ", Style::default().fg(attachment_color)),
                             Span::styled(&attachment.filename, Style::default().fg(attachment_color)),
-                            Span::styled(dim_text, Style::default().fg(dim_color)),
                         ]));
                     } else {
                         message_lines.push(Line::from(Span::styled(
-                            format!("🖼️  {} (images disabled)", attachment.filename),
-                            Style::default().fg(dim_color)
+                            format!("i  {} (images disabled)", attachment.filename),
+                            Style::default().fg(dim_color),
                         )));
                     }
                 } else {
-                    // Show file size if available
                     message_lines.push(Line::from(Span::styled(
-                        format!("📎 {}", attachment.filename),
-                        Style::default().fg(attachment_color)
+                        format!("f {}", attachment.filename),
+                        Style::default().fg(attachment_color),
                     )));
                 }
             }
-            message_lines.push(Line::from("")); // Spacing after attachment list
+            message_lines.push(Line::from(""));
         }
         
         let text_height = message_lines.len() as u16;
@@ -223,41 +195,31 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             height: text_height.min(message_area.height),
         };
         
-        let message_para = Paragraph::new(message_lines)
-            .wrap(Wrap { trim: false });
-        
+        let message_para = Paragraph::new(message_lines).wrap(Wrap { trim: false });
         f.render_widget(message_para, text_area);
         
-        // Draw image attachments with better sizing and spacing
         if show_attachments && !image_attachments.is_empty() {
             let mut image_y = text_area.y + text_height;
+            let max_img_height = app.config.images.max_image_height;
             
-            for attachment in image_attachments {
+            for attachment in image_attachments.iter() {
                 if image_y >= message_area.bottom() {
                     break;
                 }
                 
-                // Calculate optimal dimensions maintaining aspect ratio
-                let (img_width, img_height) = calculate_image_dimensions(
-                    attachment.width,
-                    attachment.height,
-                    app.config.images.max_image_width,
-                    app.config.images.max_image_height,
-                    message_area.width.saturating_sub(2),
-                );
+                if let Some(protocol) = app.image_renderer.get_attachment(&attachment.id) {
+                    let available_height = message_area.bottom().saturating_sub(image_y);
+                    let img_height = max_img_height.min(available_height);
                 
-                if let Some(image_protocol) = app.image_renderer.get_attachment(&attachment.id) {
                     let image_area = Rect {
                         x: message_area.x,
                         y: image_y,
-                        width: img_width.min(message_area.width),
-                        height: img_height.min(message_area.bottom() - image_y),
+                        width: available_image_width.min(message_area.width),
+                        height: img_height,
                     };
-                    
-                    let image = StatefulImage::default();
-                    f.render_stateful_widget(image, image_area, image_protocol);
-                    
-                    image_y += image_area.height + 1; // +1 for spacing between images
+                    let image_widget = StatefulImage::default();
+                    f.render_stateful_widget(image_widget, image_area, protocol);
+                    image_y += img_height + 1;
                 }
             }
         }
@@ -292,12 +254,7 @@ fn draw_input(f: &mut Frame, app: &App, area: Rect) {
     }
 
     let input = Paragraph::new(app.input.as_str())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(input_title)
-                .border_style(input_style),
-        )
+        .block(Block::default().borders(Borders::ALL).title(input_title).border_style(input_style))
         .style(Style::default().fg(theme.get_color("base05")))
         .wrap(Wrap { trim: false });
     f.render_widget(input, area);
@@ -307,42 +264,4 @@ fn draw_input(f: &mut Frame, app: &App, area: Rect) {
         let cursor_y = area.y + 1 + (app.input_cursor as u16 / (area.width - 2));
         f.set_cursor_position((cursor_x, cursor_y));
     }
-}
-
-/// Calculate optimal image dimensions maintaining aspect ratio
-fn calculate_image_dimensions(
-    original_width: Option<u32>,
-    original_height: Option<u32>,
-    max_width: u16,
-    max_height: u16,
-    available_width: u16,
-) -> (u16, u16) {
-    // If no dimensions available, use defaults
-    let (orig_w, orig_h) = match (original_width, original_height) {
-        (Some(w), Some(h)) => (w as f32, h as f32),
-        _ => return (max_width.min(available_width), max_height),
-    };
-    
-    // Terminal cells are roughly 2:1 ratio (width:height)
-    // So we need to adjust for this when calculating aspect ratio
-    let cell_aspect_correction = 2.0;
-    let aspect_ratio = (orig_w / orig_h) * cell_aspect_correction;
-    
-    let max_w = max_width.min(available_width) as f32;
-    let max_h = max_height as f32;
-    
-    // Calculate dimensions maintaining aspect ratio
-    let (width, height) = if aspect_ratio > (max_w / max_h) {
-        // Width is the limiting factor
-        let w = max_w;
-        let h = (w / aspect_ratio).min(max_h);
-        (w, h)
-    } else {
-        // Height is the limiting factor
-        let h = max_h;
-        let w = (h * aspect_ratio).min(max_w);
-        (w, h)
-    };
-    
-    (width.ceil() as u16, height.ceil() as u16)
 }
