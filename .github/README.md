@@ -20,7 +20,6 @@ very work in progress discord tui made with ratatui
 - [ ] Message options after selection (delete, pin, copy IDs, add reaction, reply, forward)
 - [ ] Attachment loading and state correctness
 - [ ] Image rendering (avatars, attachments, GIFs, stickers, custom emojis)
-- [ ] Video attachment metadata display
 - [ ] Spoiler image handling
 - [ ] Images should clip instead of scale when scrolling
 - [ ] Avatar size consistency
@@ -55,7 +54,5 @@ very work in progress discord tui made with ratatui
 - [ ] Channel topic rendering
 - [ ] Slowmode indicator
 - [ ] Nitro badge rendering
-- [ ] Server discovery UI
 - [ ] Stage channels
-- [ ] Scheduled events display
 - [ ] Scheduled events display
