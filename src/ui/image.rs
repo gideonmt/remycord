@@ -1,5 +1,5 @@
 use anyhow::Result;
-use image::{DynamicImage, imageops::FilterType};
+use image::{DynamicImage, imageops::FilterType, GenericImageView};
 use ratatui_image::picker::{Picker, ProtocolType};
 use ratatui_image::protocol::StatefulProtocol;
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ pub struct ImageRenderer {
 struct CachedAttachment {
     protocol: StatefulProtocol,
     original_width: u32,
-    original_height: u32,
+    original_height: u32
 }
 
 impl ImageRenderer {
@@ -57,6 +57,30 @@ impl ImageRenderer {
         }
     }
 
+    async fn save_processed_avatar_to_disk(&self, key: &str, img: &DynamicImage) -> Result<()> {
+        let dir = Self::get_cache_dir()?;
+        let path = dir.join(format!("{}.png", key));
+
+        if !path.exists() {
+            img.save(&path)?;
+        }
+
+        Ok(())
+    }
+
+
+    async fn process_and_cache_avatar(&mut self, url: &str, key: &str) -> Result<StatefulProtocol> {
+        let img = self.download_image(url).await?;
+
+        let size = 128;
+        let resized = img.resize_exact(size, size, FilterType::Lanczos3);
+        let masked = Self::circle_mask(resized);
+
+        self.save_processed_avatar_to_disk(key, &masked).await?;
+
+        Ok(self.picker.new_resize_protocol(masked))
+    }
+
     /// Download and cache an avatar image
     pub async fn load_avatar(&mut self, user_id: &str, avatar_hash: Option<&str>) -> Result<()> {
         if self.avatar_cache.contains_key(user_id) {
@@ -64,23 +88,33 @@ impl ImageRenderer {
         }
 
         let url = Self::get_avatar_url(user_id, avatar_hash);
-        
-        if let Ok(protocol) = self.load_from_disk_cache(&format!("avatar_{}", user_id)).await {
+        let key = format!("avatar_{}", user_id);
+
+        // try loading processed from disk
+        if let Ok(protocol) = self.load_processed_avatar_from_disk(&key).await {
             self.avatar_cache.insert(user_id.to_string(), protocol);
             return Ok(());
         }
-        
-        match self.download_and_process_image(&url, 32, 32).await {
-            Ok(protocol) => {
-                let _ = self.save_to_disk_cache(&format!("avatar_{}", user_id), &url).await;
-                self.avatar_cache.insert(user_id.to_string(), protocol);
-                Ok(())
-            }
-            Err(e) => {
-                eprintln!("Failed to load avatar for {}: {}", user_id, e);
-                Err(e)
-            }
+
+        // otherwise download + process + save processed
+        let protocol = self.process_and_cache_avatar(&url, &key).await?;
+        self.avatar_cache.insert(user_id.to_string(), protocol);
+
+        Ok(())
+    }
+
+    async fn load_processed_avatar_from_disk(&mut self, key: &str) -> Result<StatefulProtocol> {
+        let dir = Self::get_cache_dir()?;
+        let path = dir.join(format!("{}.png", key));
+
+        if !path.exists() {
+            return Err(anyhow::anyhow!("no processed avatar"));
         }
+
+        let bytes = fs::read(&path).await?;
+        let img = image::load_from_memory(&bytes)?;
+
+        Ok(self.picker.new_resize_protocol(img))
     }
 
     /// Download and cache an attachment image with proper sizing
@@ -157,28 +191,6 @@ impl ImageRenderer {
         Ok(img)
     }
 
-    /// Download image from URL and process it
-    async fn download_and_process_image(
-        &mut self,
-        url: &str,
-        max_width: u32,
-        max_height: u32,
-    ) -> Result<StatefulProtocol> {
-        let img = self.download_image(url).await?;
-        
-        let (target_width, target_height) = self.calculate_target_dimensions(
-            img.width(),
-            img.height(),
-            max_width,
-            max_height,
-        );
-        
-        let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
-        let protocol = self.picker.new_resize_protocol(resized);
-        
-        Ok(protocol)
-    }
-
     /// Calculate target dimensions maintaining aspect ratio
     fn calculate_target_dimensions(
         &self,
@@ -203,25 +215,34 @@ impl ImageRenderer {
         (w, h)
     }
 
+    fn circle_mask(img: DynamicImage) -> DynamicImage {
+        let mut out = image::RgbaImage::new(img.width(), img.height());
+        let (w, h) = (img.width(), img.height());
+        let cx = w as f32 / 2.0;
+        let cy = h as f32 / 2.0;
+        let r = w.min(h) as f32 / 2.0;
+        let r2 = r * r;
+
+        for y in 0..h {
+            for x in 0..w {
+                let dx = x as f32 - cx;
+                let dy = y as f32 - cy;
+                let inside = dx*dx + dy*dy <= r2;
+
+                let mut p = img.get_pixel(x, y);
+                if !inside {
+                    p.0[3] = 0;
+                }
+                out.put_pixel(x, y, p);
+            }
+        }
+
+        DynamicImage::ImageRgba8(out)
+    }
 
     /// Get cache directory
     fn get_cache_dir() -> Result<PathBuf> {
         crate::config::get_image_cache_dir()
-    }
-
-    /// Load image from disk cache
-    async fn load_from_disk_cache(&mut self, key: &str) -> Result<StatefulProtocol> {
-        let cache_dir = Self::get_cache_dir()?;
-        let cache_path = cache_dir.join(format!("{}.png", key));
-        
-        if cache_path.exists() {
-            let bytes = fs::read(&cache_path).await?;
-            let img = image::load_from_memory(&bytes)?;
-            let protocol = self.picker.new_resize_protocol(img);
-            Ok(protocol)
-        } else {
-            Err(anyhow::anyhow!("Cache file not found"))
-        }
     }
 
     /// Load attachment from disk cache with metadata
@@ -249,20 +270,6 @@ impl ImageRenderer {
         } else {
             Err(anyhow::anyhow!("Cache file not found"))
         }
-    }
-
-    /// Save image to disk cache
-    async fn save_to_disk_cache(&self, key: &str, url: &str) -> Result<()> {
-        let cache_dir = Self::get_cache_dir()?;
-        let cache_path = cache_dir.join(format!("{}.png", key));
-        
-        if !cache_path.exists() {
-            let response = reqwest::get(url).await?;
-            let bytes = response.bytes().await?;
-            fs::write(&cache_path, &bytes).await?;
-        }
-        
-        Ok(())
     }
 
     /// Save attachment to disk cache with metadata

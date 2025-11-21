@@ -112,7 +112,7 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
                 if app.config.images.enabled && app.config.images.render_avatars {
                     let _ = app.image_renderer.load_avatar(
                         &msg.author_id,
-                        msg.author_avatar.as_deref()
+                        msg.author_avatar.as_deref(),
                     ).await;
                 }
                 
@@ -306,3 +306,4 @@ async fn run_app(
         }
     }
 }
+
