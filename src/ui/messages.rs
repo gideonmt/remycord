@@ -8,6 +8,12 @@ use ratatui::{
 };
 use ratatui_image::StatefulImage;
 
+// Minimum height for each message row (includes header + at least 1 line of space)
+const MIN_MESSAGE_HEIGHT: u16 = 3;
+// Fixed avatar display size (in terminal cells)
+const AVATAR_DISPLAY_WIDTH: u16 = 5;
+const AVATAR_DISPLAY_HEIGHT: u16 = 4;
+
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let input_lines = app.input.lines().count().max(1).min(app.config.general.max_input_lines);
     let input_height = (input_lines + 2) as u16;
@@ -62,15 +68,11 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         typing_line.push(Line::from(""));
     }
 
-    let avatar_width = if show_avatars { 5 } else { 0 };
-    let avatar_height = 4;
     let messages_inner = Block::default()
         .borders(Borders::ALL)
         .title("Messages")
         .border_style(Style::default().fg(border_color))
         .inner(area);
-
-    let available_image_width = messages_inner.width.saturating_sub(avatar_width + 4);
 
     let mut current_y = messages_inner.y;
     let messages_to_show = app
@@ -85,33 +87,57 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         }
 
         let content_lines = if msg.content.is_empty() { 0 } else { msg.content.lines().count() };
+        let header_height = 1;
+        let content_height = if content_lines > 0 { content_lines + 1 } else { 0 };
+        let attachment_text_height = if !msg.attachments.is_empty() { 1 + msg.attachments.len() } else { 0 };
+        let text_total_height = header_height + content_height + attachment_text_height;
+
         let has_images = show_attachments && msg.has_images();
         let image_attachments: Vec<_> = if has_images {
             msg.attachments.iter().filter(|a| a.is_image()).collect()
         } else {
             Vec::new()
         };
-        
-        let header_height = 1;
-        let content_height = if content_lines > 0 { content_lines + 1 } else { 0 };
-        let attachment_text_height = if !msg.attachments.is_empty() { 1 + msg.attachments.len() } else { 0 };
-        
+
         let image_height = if show_attachments && !image_attachments.is_empty() {
-            image_attachments.len() * (app.config.images.max_image_height as usize + 1)
+            let min_img_width = app.config.images.min_image_width;
+            let max_img_width = app.config.images.max_image_width;
+            let max_img_height = app.config.images.max_image_height;
+            
+            let mut total_height = 0;
+            for attachment in image_attachments.iter() {
+                if let Some((orig_width, orig_height)) = app.image_renderer.get_attachment_dimensions(&attachment.id) {
+                    let aspect_ratio = orig_width as f32 / orig_height as f32;
+                    
+                    let target_width = if orig_width < min_img_width as u32 {
+                        min_img_width
+                    } else if orig_width > max_img_width as u32 {
+                        max_img_width
+                    } else {
+                        orig_width as u16
+                    };
+                    
+                    let calculated_height = (target_width as f32 / aspect_ratio) as u16;
+                    let target_height = calculated_height.min(max_img_height);
+                    
+                    total_height += target_height as usize + 1;
+                }
+            }
+            total_height
         } else {
             0
         };
-        
-        let text_total_height = header_height + content_height + attachment_text_height;
-        let total_height = text_total_height + image_height;
+
+        let calculated_height = text_total_height + image_height;
+        let total_height = calculated_height.max(MIN_MESSAGE_HEIGHT as usize);
         let remaining_height = messages_inner.bottom().saturating_sub(current_y);
-        let msg_height = total_height.min(remaining_height as usize) as u16;
+        let msg_height = (total_height.min(remaining_height as usize) as u16).max(MIN_MESSAGE_HEIGHT);
 
         let msg_chunks = if show_avatars {
             Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Length(avatar_width),
+                    Constraint::Length(AVATAR_DISPLAY_WIDTH),
                     Constraint::Min(0),
                 ])
                 .split(Rect {
@@ -135,8 +161,8 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
                 let avatar_area = Rect {
                     x: msg_chunks[0].x,
                     y: msg_chunks[0].y,
-                    width: msg_chunks[0].width,
-                    height: avatar_height.min(msg_chunks[0].height),
+                    width: AVATAR_DISPLAY_WIDTH,
+                    height: AVATAR_DISPLAY_HEIGHT.min(msg_chunks[0].height),
                 };
                 let image_widget = StatefulImage::default();
                 f.render_stateful_widget(image_widget, avatar_area, protocol);
@@ -144,25 +170,25 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         }
 
         let message_area = if show_avatars { msg_chunks[1] } else { msg_chunks[0] };
-        
+
         let author_style = Style::default().fg(author_color).add_modifier(Modifier::BOLD);
         let time_style = Style::default().fg(time_color);
-        
+
         let mut header_spans = vec![];
         if app.config.general.show_timestamps {
             header_spans.push(Span::styled(format!("[{}] ", msg.timestamp), time_style));
         }
         header_spans.push(Span::styled(&msg.author, author_style));
-        
+
         let mut message_lines = vec![Line::from(header_spans)];
-        
+
         if !msg.content.is_empty() {
             for line in msg.content.lines() {
                 message_lines.push(Line::from(Span::styled(line.to_string(), Style::default().fg(text_color))));
             }
             message_lines.push(Line::from(""));
         }
-        
+
         if !msg.attachments.is_empty() {
             for attachment in msg.attachments.iter() {
                 if attachment.is_image() {
@@ -186,7 +212,7 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             }
             message_lines.push(Line::from(""));
         }
-        
+
         let text_height = message_lines.len() as u16;
         let text_area = Rect {
             x: message_area.x,
@@ -194,36 +220,56 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             width: message_area.width,
             height: text_height.min(message_area.height),
         };
-        
+
         let message_para = Paragraph::new(message_lines).wrap(Wrap { trim: false });
         f.render_widget(message_para, text_area);
-        
+
         if show_attachments && !image_attachments.is_empty() {
             let mut image_y = text_area.y + text_height;
+            let min_img_width = app.config.images.min_image_width;
+            let max_img_width = app.config.images.max_image_width;
             let max_img_height = app.config.images.max_image_height;
-            
+
             for attachment in image_attachments.iter() {
                 if image_y >= message_area.bottom() {
                     break;
                 }
-                
+
+                let (orig_width, orig_height) = app.image_renderer
+                    .get_attachment_dimensions(&attachment.id)
+                    .unwrap_or((800, 600));
+
                 if let Some(protocol) = app.image_renderer.get_attachment(&attachment.id) {
+                    let aspect_ratio = orig_width as f32 / orig_height as f32;
+                    
+                    let target_width = if orig_width < min_img_width as u32 {
+                        min_img_width
+                    } else if orig_width > max_img_width as u32 {
+                        max_img_width
+                    } else {
+                        orig_width as u16
+                    };
+                    
+                    let calculated_height = (target_width as f32 / aspect_ratio) as u16;
+                    let target_height = calculated_height.min(max_img_height);
+                    
                     let available_height = message_area.bottom().saturating_sub(image_y);
-                    let img_height = max_img_height.min(available_height);
-                
+                    let img_height = target_height.min(available_height);
+
                     let image_area = Rect {
                         x: message_area.x,
                         y: image_y,
-                        width: available_image_width.min(message_area.width),
+                        width: target_width,
                         height: img_height,
                     };
+                    
                     let image_widget = StatefulImage::default();
                     f.render_stateful_widget(image_widget, image_area, protocol);
                     image_y += img_height + 1;
                 }
             }
         }
-        
+
         current_y += msg_height;
     }
 

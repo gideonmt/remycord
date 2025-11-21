@@ -108,9 +108,6 @@ impl ImageRenderer {
         &mut self,
         attachment_id: &str,
         url: &str,
-        max_width: u16,
-        max_height: u16,
-        clip: bool,
     ) -> Result<()> {
         if self.attachment_cache.contains_key(attachment_id) {
             return Ok(());
@@ -129,24 +126,7 @@ impl ImageRenderer {
         let original_width = img.width();
         let original_height = img.height();
 
-        let processed = if clip {
-            let target_height = max_height as u32;
-            let aspect_ratio = original_width as f32 / original_height as f32;
-            let target_width = (target_height as f32 * aspect_ratio) as u32;
-            
-            let resized = img.resize_exact(target_width, target_height, FilterType::Lanczos3);
-            Self::clip_to_box(resized, max_width as u32, max_height as u32)
-        } else {
-            let (target_width, target_height) = self.calculate_target_dimensions(
-                original_width,
-                original_height,
-                max_width as u32,
-                max_height as u32,
-            );
-            img.resize_exact(target_width, target_height, FilterType::Lanczos3)
-        };
-
-        let protocol = self.picker.new_resize_protocol(processed);
+        let protocol = self.picker.new_resize_protocol(img);
         let _ = self.save_attachment_to_disk_cache(attachment_id, url, original_width, original_height).await;
 
         self.attachment_cache.insert(attachment_id.to_string(), CachedAttachment {
@@ -162,26 +142,6 @@ impl ImageRenderer {
         let response = reqwest::get(url).await?;
         let bytes = response.bytes().await?;
         Ok(image::load_from_memory(&bytes)?)
-    }
-
-    fn calculate_target_dimensions(
-        &self,
-        original_width: u32,
-        original_height: u32,
-        max_width: u32,
-        max_height: u32,
-    ) -> (u32, u32) {
-        let aspect_ratio = original_width as f32 / original_height as f32;
-        let max_ratio = max_width as f32 / max_height as f32;
-        if aspect_ratio > max_ratio {
-            let w = max_width;
-            let h = (w as f32 / aspect_ratio) as u32;
-            (w, h)
-        } else {
-            let h = max_height;
-            let w = (h as f32 * aspect_ratio) as u32;
-            (w, h)
-        }
     }
 
     fn circle_mask(img: DynamicImage) -> DynamicImage {
@@ -203,19 +163,6 @@ impl ImageRenderer {
             }
         }
 
-        DynamicImage::ImageRgba8(out)
-    }
-
-    fn clip_to_box(img: DynamicImage, max_width: u32, max_height: u32) -> DynamicImage {
-        let (orig_w, orig_h) = img.dimensions();
-        let w = orig_w.min(max_width);
-        let h = orig_h.min(max_height);
-        let mut out = image::RgbaImage::new(w, h);
-        for y in 0..h {
-            for x in 0..w {
-                out.put_pixel(x, y, img.get_pixel(x, y));
-            }
-        }
         DynamicImage::ImageRgba8(out)
     }
 
@@ -334,6 +281,10 @@ impl ImageRenderer {
 
     pub fn get_attachment(&mut self, attachment_id: &str) -> Option<&mut StatefulProtocol> {
         self.attachment_cache.get_mut(attachment_id).map(|c| &mut c.protocol)
+    }
+
+    pub fn get_attachment_dimensions(&self, attachment_id: &str) -> Option<(u32, u32)> {
+        self.attachment_cache.get(attachment_id).map(|c| (c.original_width, c.original_height))
     }
 
     pub fn clear_memory_cache(&mut self) {

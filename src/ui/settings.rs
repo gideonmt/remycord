@@ -36,6 +36,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         format!("  Render Stickers: {}", if app.config.images.render_stickers { "Yes" } else { "No" }),
         format!("  Render Attachments: {}", if app.config.images.render_attachments { "Yes" } else { "No" }),
         format!("  Render Server Icons: {}", if app.config.images.render_server_icons { "Yes" } else { "No" }),
+        format!("  Min Image Width: {} cols", app.config.images.min_image_width),
         format!("  Max Image Width: {} cols", app.config.images.max_image_width),
         format!("  Max Image Height: {} rows", app.config.images.max_image_height),
         "".to_string(),

@@ -117,15 +117,10 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
                 }
                 
                 if app.config.images.enabled && app.config.images.render_attachments {
-                    let max_w = app.config.images.max_image_width;
-                    let max_h = app.config.images.max_image_height;
                     for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
                         let _ = app.image_renderer.load_attachment(
                             &attachment.id,
                             &attachment.url,
-                            max_w,
-                            max_h,
-                            true
                         ).await;
                     }
                 }
@@ -260,18 +255,12 @@ async fn run_app(
                                     }
                                     
                                     if app.config.images.enabled && app.config.images.render_attachments {
-                                        let max_w = app.config.images.max_image_width;
-                                        let max_h = app.config.images.max_image_height;
-
                                         for msg in &messages {
                                             for attachment in msg.attachments.iter().filter(|a| a.is_image()) {
                                                 let _ = app.image_renderer
                                                     .load_attachment(
                                                         &attachment.id, 
-                                                        &attachment.url, 
-                                                        max_w,
-                                                        max_h,
-                                                        true
+                                                        &attachment.url,
                                                     )
                                                     .await;
                                             }

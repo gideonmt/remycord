@@ -112,10 +112,10 @@ pub fn handle_input_mode(app: &mut App, key: KeyEvent, kb: &Keybinds) {
 pub fn handle_settings_input(app: &mut App, key: KeyEvent, kb: &Keybinds) -> Result<()> {
     if key.code == KeyCode::Down || kb.down.matches(key.code, key.modifiers) {
         let mut next = app.settings_selected + 1;
-        while next < 43 && !is_selectable_item(next) {
+        while next < 45 && !is_selectable_item(next) {
             next += 1;
         }
-        if next < 43 {
+        if next < 45 {
             app.settings_selected = next;
         }
     } else if key.code == KeyCode::Up || kb.up.matches(key.code, key.modifiers) {
@@ -270,15 +270,26 @@ fn edit_setting(app: &mut App) -> Result<()> {
         15 => app.config.images.render_attachments = !app.config.images.render_attachments,
         16 => app.config.images.render_server_icons = !app.config.images.render_server_icons,
         17 => {
-            app.config.images.max_image_width = match app.config.images.max_image_width {
+            // Min image width
+            app.config.images.min_image_width = match app.config.images.min_image_width {
                 10 => 20,
                 20 => 30,
                 30 => 40,
-                40 => 50,
                 _ => 10,
             };
         }
         18 => {
+            // Max image width
+            app.config.images.max_image_width = match app.config.images.max_image_width {
+                20 => 30,
+                30 => 40,
+                40 => 50,
+                50 => 60,
+                _ => 20,
+            };
+        }
+        19 => {
+            // Max image height
             app.config.images.max_image_height = match app.config.images.max_image_height {
                 5 => 10,
                 10 => 15,
@@ -289,7 +300,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
         }
         
         // Cache settings
-        23 => {
+        25 => {
             // Max cache size
             app.config.images.max_cache_size_mb = match app.config.images.max_cache_size_mb {
                 50 => 100,
@@ -299,7 +310,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
                 _ => 50,
             };
         }
-        24 => {
+        26 => {
             // Warning threshold
             app.config.images.cache_warn_threshold_percent = match app.config.images.cache_warn_threshold_percent {
                 60 => 70,
@@ -309,17 +320,17 @@ fn edit_setting(app: &mut App) -> Result<()> {
                 _ => 60,
             };
         }
-        25 => {
+        27 => {
             // Auto clear
             app.config.images.cache_auto_clear = app.config.images.cache_auto_clear.next();
         }
-        26 => {
+        28 => {
             // Clear on exit
             app.config.images.cache_clear_on_exit = !app.config.images.cache_clear_on_exit;
         }
         
         // Cache actions
-        28 => {
+        30 => {
             // Clear all cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
@@ -328,7 +339,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
             app.image_renderer.clear_memory_cache();
             app.add_notification(Notification::success("Cache cleared!"));
         }
-        29 => {
+        31 => {
             // Clear avatar cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
@@ -336,7 +347,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
             });
             app.add_notification(Notification::success("Avatar cache cleared!"));
         }
-        30 => {
+        32 => {
             // Clear attachment cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
@@ -354,9 +365,9 @@ fn edit_setting(app: &mut App) -> Result<()> {
 
 
 fn is_selectable_item(index: usize) -> bool {
-    // Headers: 0, 9, 20, 32
-    // Read-only: 1, 10, 21, 22, 27
-    !matches!(index, 0 | 8 | 9 | 10 | 19 | 20 | 21 | 22 | 27 | 31 | 32)
+    // Headers: 0, 9, 20, 33
+    // Read-only: 1, 10, 21, 22, 23, 24, 29
+    !matches!(index, 0 | 8 | 9 | 10 | 20 | 21 | 22 | 23 | 24 | 29 | 33 | 34)
 }
 
 fn cycle_theme(app: &mut App) -> Result<()> {
@@ -374,15 +385,15 @@ fn cycle_theme(app: &mut App) -> Result<()> {
 
 fn start_keybind_recording(app: &mut App) {
     let action = match app.settings_selected {
-        19 => Some("Quit"),
-        20 => Some("Settings"),
-        21 => Some("Up"),
-        22 => Some("Down"),
-        23 => Some("Select"),
-        24 => Some("Back"),
-        25 => Some("Input Mode"),
-        26 => Some("Attach File"),
-        27 => Some("Send Message"),
+        35 => Some("Quit"),
+        36 => Some("Settings"),
+        37 => Some("Up"),
+        38 => Some("Down"),
+        39 => Some("Select"),
+        40 => Some("Back"),
+        41 => Some("Input Mode"),
+        42 => Some("Attach File"),
+        43 => Some("Send Message"),
         _ => None,
     };
     
