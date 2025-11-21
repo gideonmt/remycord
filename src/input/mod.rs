@@ -14,24 +14,35 @@ pub fn handle_input(
     key: KeyEvent,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 ) -> Result<bool> {
+    // DEBUG: Print what key was pressed
+    eprintln!("Key pressed: {:?}, Modifiers: {:?}, Current mode: {:?}", key.code, key.modifiers, app.mode);
+    
     if let AppMode::KeybindRecording(action) = &app.mode.clone() {
         return handlers::handle_keybind_recording(app, key, action);
     }
 
     let kb = &app.config.keybinds.clone();
-    let should_quit = 
-        kb.quit.matches(key.code, key.modifiers) || 
-        (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL));
+    
+    // Handle Ctrl+C globally - always quit
+    if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        eprintln!("Ctrl+C detected - quitting!");
+        return Ok(true);
+    }
+    
+    let should_quit = kb.quit.matches(key.code, key.modifiers);
+    eprintln!("Should quit: {}", should_quit);
 
     match &app.mode {
         AppMode::Sidebar => {
             if should_quit {
+                eprintln!("Quitting from sidebar!");
                 return Ok(true);
             }
             handlers::handle_sidebar_input(app, key, kb);
         }
         AppMode::Messages => {
-            if kb.quit.matches(key.code, key.modifiers) || kb.back.matches(key.code, key.modifiers) {
+            if should_quit || kb.back.matches(key.code, key.modifiers) {
+                eprintln!("Exiting channel");
                 handlers::exit_channel(app);
             } else {
                 handlers::handle_messages_input(app, key, kb, terminal)?;
@@ -42,6 +53,7 @@ pub fn handle_input(
         }
         AppMode::Settings => {
             if should_quit || key.code == KeyCode::Esc {
+                eprintln!("Exiting settings");
                 save_config(&app.config)?;
                 app.mode = if app.selected_channel.is_some() {
                     AppMode::Messages
@@ -57,3 +69,4 @@ pub fn handle_input(
 
     Ok(false)
 }
+

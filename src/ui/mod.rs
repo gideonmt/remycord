@@ -4,6 +4,7 @@ mod settings;
 mod help;
 mod utils;
 pub mod image;
+pub mod notifications;
 
 use crate::app::{App, AppMode};
 use ratatui::Frame;

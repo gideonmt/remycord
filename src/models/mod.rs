@@ -10,4 +10,4 @@ pub use channel::{Channel, ChannelList, ChannelCategory, ChannelType};
 pub use message::{Message, MessageAttachment};
 pub use file::AttachedFile;
 pub use dm::{DmChannel, DmUser};
-pub use notification::Notification;
+pub use notification::{Notification, NotificationKind};

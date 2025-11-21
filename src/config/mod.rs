@@ -44,6 +44,18 @@ pub struct ImageSettings {
     pub cache_images_disk: bool,
     pub max_cache_size_mb: usize,
     pub image_quality: ImageQuality,
+    pub cache_auto_clear: CacheAutoClear,
+    pub cache_clear_on_exit: bool,
+    pub cache_warn_threshold_percent: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum CacheAutoClear {
+    Never,
+    WhenFull,
+    Every30Minutes,
+    EveryHour,
+    EveryDay,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,6 +110,9 @@ impl Default for ImageSettings {
             cache_images_disk: true,
             max_cache_size_mb: 100,
             image_quality: ImageQuality::High,
+            cache_auto_clear: CacheAutoClear::WhenFull,
+            cache_clear_on_exit: false,
+            cache_warn_threshold_percent: 80,
         }
     }
 }
@@ -108,6 +123,38 @@ impl ImageQuality {
             ImageQuality::Low => image::imageops::FilterType::Nearest,
             ImageQuality::Medium => image::imageops::FilterType::Triangle,
             ImageQuality::High => image::imageops::FilterType::Lanczos3,
+        }
+    }
+}
+
+impl CacheAutoClear {
+    pub fn duration_secs(&self) -> Option<u64> {
+        match self {
+            CacheAutoClear::Never => None,
+            CacheAutoClear::WhenFull => None,
+            CacheAutoClear::Every30Minutes => Some(30 * 60),
+            CacheAutoClear::EveryHour => Some(60 * 60),
+            CacheAutoClear::EveryDay => Some(24 * 60 * 60),
+        }
+    }
+    
+    pub fn next(&self) -> Self {
+        match self {
+            CacheAutoClear::Never => CacheAutoClear::WhenFull,
+            CacheAutoClear::WhenFull => CacheAutoClear::Every30Minutes,
+            CacheAutoClear::Every30Minutes => CacheAutoClear::EveryHour,
+            CacheAutoClear::EveryHour => CacheAutoClear::EveryDay,
+            CacheAutoClear::EveryDay => CacheAutoClear::Never,
+        }
+    }
+    
+    pub fn as_str(&self) -> &str {
+        match self {
+            CacheAutoClear::Never => "Never",
+            CacheAutoClear::WhenFull => "When Full",
+            CacheAutoClear::Every30Minutes => "Every 30 Minutes",
+            CacheAutoClear::EveryHour => "Every Hour",
+            CacheAutoClear::EveryDay => "Every Day",
         }
     }
 }

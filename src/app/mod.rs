@@ -5,12 +5,13 @@ mod state;
 pub use mode::AppMode;
 pub use sidebar::SidebarItem;
 
-use crate::config::{Config, Theme, load_theme};
+use crate::config::{Config, Theme, load_theme, CacheAutoClear};
 use crate::models::{Guild, Channel, Message, AttachedFile, DmChannel, Notification, ChannelList, ChannelCategory};
 use crate::discord::DiscordClient;
-use crate::ui::image::ImageRenderer;
+use crate::ui::image::{ImageRenderer, CacheStats};
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::time::Instant;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -38,6 +39,10 @@ pub struct App {
     pub loading_dms: bool,
     pub notifications: Vec<Notification>,
     pub image_renderer: ImageRenderer,
+    pub cache_stats: Option<CacheStats>,
+    pub last_cache_check: Instant,
+    pub last_cache_clear: Instant,
+    pub cache_warning_shown: bool,
 }
 
 impl App {
@@ -66,6 +71,10 @@ impl App {
             loading_dms: false,
             notifications: Vec::new(),
             image_renderer: ImageRenderer::new(),
+                    cache_stats: None,
+            last_cache_check: Instant::now(),
+            last_cache_clear: Instant::now(),
+            cache_warning_shown: false,
         }
     }
     
@@ -134,5 +143,57 @@ impl App {
 
     pub fn set_discord_client(&mut self, client: DiscordClient) {
         self.discord_client = Some(Arc::new(Mutex::new(client)));
+    }
+
+    pub async fn update_cache_stats(&mut self) {
+        if let Ok(stats) = ImageRenderer::get_cache_stats().await {
+            self.cache_stats = Some(stats);
+        }
+    }
+
+    pub async fn check_cache_health(&mut self) {
+        self.update_cache_stats().await;
+        
+        if let Some(stats) = &self.cache_stats {
+            let max_size_bytes = (self.config.images.max_cache_size_mb * 1024 * 1024) as u64;
+            let usage_percent = (stats.total_size_bytes as f64 / max_size_bytes as f64 * 100.0) as u8;
+            
+            if usage_percent >= self.config.images.cache_warn_threshold_percent && !self.cache_warning_shown {
+                self.add_notification(Notification::warning(
+                    format!("Cache is {}% full ({}/{}MB). Consider clearing cache in settings.", 
+                        usage_percent, 
+                        stats.total_size_mb() as usize,
+                        self.config.images.max_cache_size_mb)
+                ));
+                self.cache_warning_shown = true;
+            }
+            
+            if self.config.images.cache_auto_clear == CacheAutoClear::WhenFull 
+                && usage_percent >= 95 {
+                self.add_notification(Notification::info("Cache full, auto-clearing..."));
+                let _ = ImageRenderer::clear_cache().await;
+                self.image_renderer.clear_memory_cache();
+                self.update_cache_stats().await;
+                self.cache_warning_shown = false;
+            }
+            
+            if usage_percent < self.config.images.cache_warn_threshold_percent {
+                self.cache_warning_shown = false;
+            }
+        }
+        
+        self.last_cache_check = Instant::now();
+    }
+    
+    pub async fn check_scheduled_cache_clear(&mut self) {
+        if let Some(duration_secs) = self.config.images.cache_auto_clear.duration_secs() {
+            if self.last_cache_clear.elapsed().as_secs() >= duration_secs {
+                self.add_notification(Notification::info("Scheduled cache clear..."));
+                let _ = ImageRenderer::clear_cache().await;
+                self.image_renderer.clear_memory_cache();
+                self.update_cache_stats().await;
+                self.last_cache_clear = Instant::now();
+            }
+        }
     }
 }

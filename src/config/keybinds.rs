@@ -60,7 +60,10 @@ impl KeyBind {
 
     pub fn matches(&self, code: KeyCode, mods: KeyModifiers) -> bool {
         let key_matches = match code {
-            KeyCode::Char(c) => self.key == c.to_string(),
+            KeyCode::Char(c) => {
+                let c_str = c.to_string();
+                self.key == c_str || self.key.to_lowercase() == c_str.to_lowercase()
+            },
             KeyCode::Enter => self.key == "Enter",
             KeyCode::Esc => self.key == "Esc",
             KeyCode::Backspace => self.key == "Backspace",
@@ -86,6 +89,14 @@ impl KeyBind {
         let needs_alt = self.modifiers.contains(&"Alt".to_string());
         let needs_shift = self.modifiers.contains(&"Shift".to_string());
 
-        has_ctrl == needs_ctrl && has_alt == needs_alt && has_shift == needs_shift
+        has_ctrl == needs_ctrl && has_alt == needs_alt && has_shift == needs_shift;
+
+        let matches = has_ctrl == needs_ctrl && has_alt == needs_alt && has_shift == needs_shift;
+        
+        // DEBUG OUTPUT
+        eprintln!("KeyBind check: key='{}' expected='{}' key_matches={} has_ctrl={} needs_ctrl={} result={}",
+            format!("{:?}", code), self.key, key_matches, has_ctrl, needs_ctrl, matches);
+
+        matches
     }
 }

@@ -4,7 +4,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
 use crate::app::{App, AppMode, SidebarItem};
-use crate::config::{Keybinds, KeyBind, save_config, get_available_themes};
+use crate::config::{Keybinds, KeyBind, save_config, get_available_themes, CacheAutoClear};
 use crate::models::{Notification, ChannelType};
 use super::file_picker;
 
@@ -111,12 +111,21 @@ pub fn handle_input_mode(app: &mut App, key: KeyEvent, kb: &Keybinds) {
 
 pub fn handle_settings_input(app: &mut App, key: KeyEvent, kb: &Keybinds) -> Result<()> {
     if key.code == KeyCode::Down || kb.down.matches(key.code, key.modifiers) {
-        if app.settings_selected < 27 { // Updated max index
-            app.settings_selected += 1;
+        let mut next = app.settings_selected + 1;
+        while next < 43 && !is_selectable_item(next) {
+            next += 1;
+        }
+        if next < 43 {
+            app.settings_selected = next;
         }
     } else if key.code == KeyCode::Up || kb.up.matches(key.code, key.modifiers) {
         if app.settings_selected > 0 {
-            app.settings_selected -= 1;
+            let mut prev = app.settings_selected - 1;
+            while prev > 0 && !is_selectable_item(prev) {
+                if prev == 0 { break; }
+                prev -= 1;
+            }
+            app.settings_selected = prev;
         }
     } else if key.code == KeyCode::Enter {
         edit_setting(app)?;
@@ -167,9 +176,7 @@ fn select_sidebar_item(app: &mut App) {
                 
                 app.mode = AppMode::Messages;
             }
-            SidebarItem::ServerSection => {
-                // Do nothing, just a label
-            }
+            SidebarItem::ServerSection => {}
             SidebarItem::Server(guild) => {
                 if let Some(g) = app.guilds.iter_mut().find(|g| g.id == guild.id) {
                     g.toggle_expanded();
@@ -237,33 +244,32 @@ fn scroll_messages_up(app: &mut App) {
 
 fn edit_setting(app: &mut App) -> Result<()> {
     match app.settings_selected {
-        1 => {
+        2 => {
             app.config.general.file_manager = if app.config.general.file_manager == "fzf" {
                 "lf".to_string()
             } else {
                 "fzf".to_string()
             };
         }
-        2 => app.config.general.show_timestamps = !app.config.general.show_timestamps,
-        3 => app.config.general.show_typing_indicators = !app.config.general.show_typing_indicators,
-        4 => app.config.general.message_scroll_speed = (app.config.general.message_scroll_speed % 5) + 1,
-        5 => {
+        3 => app.config.general.show_timestamps = !app.config.general.show_timestamps,
+        4 => app.config.general.show_typing_indicators = !app.config.general.show_typing_indicators,
+        5 => app.config.general.message_scroll_speed = (app.config.general.message_scroll_speed % 5) + 1,
+        6 => {
             app.config.general.max_input_lines = if app.config.general.max_input_lines >= 12 {
                 4
             } else {
                 app.config.general.max_input_lines + 1
             };
         }
-        6 => cycle_theme(app)?,
-        // Skip 7 (empty line)
-        // Skip 8 (Image Support - read-only)
-        9 => app.config.images.enabled = !app.config.images.enabled,
-        10 => app.config.images.render_avatars = !app.config.images.render_avatars,
-        11 => app.config.images.render_emojis = !app.config.images.render_emojis,
-        12 => app.config.images.render_stickers = !app.config.images.render_stickers,
-        13 => app.config.images.render_attachments = !app.config.images.render_attachments,
-        14 => app.config.images.render_server_icons = !app.config.images.render_server_icons,
-        15 => {
+        7 => cycle_theme(app)?,
+        
+        11 => app.config.images.enabled = !app.config.images.enabled,
+        12 => app.config.images.render_avatars = !app.config.images.render_avatars,
+        13 => app.config.images.render_emojis = !app.config.images.render_emojis,
+        14 => app.config.images.render_stickers = !app.config.images.render_stickers,
+        15 => app.config.images.render_attachments = !app.config.images.render_attachments,
+        16 => app.config.images.render_server_icons = !app.config.images.render_server_icons,
+        17 => {
             app.config.images.max_image_width = match app.config.images.max_image_width {
                 10 => 20,
                 20 => 30,
@@ -272,7 +278,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
                 _ => 10,
             };
         }
-        16 => {
+        18 => {
             app.config.images.max_image_height = match app.config.images.max_image_height {
                 5 => 10,
                 10 => 15,
@@ -281,11 +287,76 @@ fn edit_setting(app: &mut App) -> Result<()> {
                 _ => 5,
             };
         }
+        
+        // Cache settings
+        23 => {
+            // Max cache size
+            app.config.images.max_cache_size_mb = match app.config.images.max_cache_size_mb {
+                50 => 100,
+                100 => 250,
+                250 => 500,
+                500 => 1000,
+                _ => 50,
+            };
+        }
+        24 => {
+            // Warning threshold
+            app.config.images.cache_warn_threshold_percent = match app.config.images.cache_warn_threshold_percent {
+                60 => 70,
+                70 => 80,
+                80 => 90,
+                90 => 95,
+                _ => 60,
+            };
+        }
+        25 => {
+            // Auto clear
+            app.config.images.cache_auto_clear = app.config.images.cache_auto_clear.next();
+        }
+        26 => {
+            // Clear on exit
+            app.config.images.cache_clear_on_exit = !app.config.images.cache_clear_on_exit;
+        }
+        
+        // Cache actions
+        28 => {
+            // Clear all cache
+            tokio::spawn(async move {
+                use crate::ui::image::ImageRenderer;
+                let _ = ImageRenderer::clear_cache().await;
+            });
+            app.image_renderer.clear_memory_cache();
+            app.add_notification(Notification::success("Cache cleared!"));
+        }
+        29 => {
+            // Clear avatar cache
+            tokio::spawn(async move {
+                use crate::ui::image::ImageRenderer;
+                let _ = ImageRenderer::clear_avatar_cache().await;
+            });
+            app.add_notification(Notification::success("Avatar cache cleared!"));
+        }
+        30 => {
+            // Clear attachment cache
+            tokio::spawn(async move {
+                use crate::ui::image::ImageRenderer;
+                let _ = ImageRenderer::clear_attachment_cache().await;
+            });
+            app.add_notification(Notification::success("Attachment cache cleared!"));
+        }
+        
         _ => {}
     }
     
     save_config(&app.config)?;
     Ok(())
+}
+
+
+fn is_selectable_item(index: usize) -> bool {
+    // Headers: 0, 9, 20, 32
+    // Read-only: 1, 10, 21, 22, 27
+    !matches!(index, 0 | 8 | 9 | 10 | 19 | 20 | 21 | 22 | 27 | 31 | 32)
 }
 
 fn cycle_theme(app: &mut App) -> Result<()> {

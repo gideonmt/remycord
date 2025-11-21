@@ -16,7 +16,7 @@ use std::io;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use app::App;
+use app::{App, AppMode};
 use config::load_config;
 use input::handle_input;
 use discord::{DiscordClient, DiscordEvent};
@@ -142,9 +142,29 @@ async fn run_app(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: Arc<Mutex<App>>,
 ) -> Result<()> {
+    let mut cache_check_timer = tokio::time::Instant::now();
+    let mut cache_stats_timer = tokio::time::Instant::now();
+    let cache_check_interval = std::time::Duration::from_secs(10);
+    let cache_stats_interval = std::time::Duration::from_secs(5);
+    
     loop {
         {
             let mut app = app.lock().await;
+            
+            // Check cache health periodically
+            if cache_check_timer.elapsed() >= cache_check_interval {
+                app.check_cache_health().await;
+                app.check_scheduled_cache_clear().await;
+                cache_check_timer = tokio::time::Instant::now();
+            }
+            
+            // Update cache stats periodically
+            if cache_stats_timer.elapsed() >= cache_stats_interval {
+                if matches!(app.mode, AppMode::Settings | AppMode::KeybindRecording(_)) {
+                    app.update_cache_stats().await;
+                }
+                cache_stats_timer = tokio::time::Instant::now();
+            }
             
             app.clear_expired_notifications();
             
@@ -266,14 +286,18 @@ async fn run_app(
                 }
             }
 
-            terminal.draw(|f| ui::draw(f, &mut app))?;
+            terminal.draw(|f| {
+                ui::draw(f, &mut app);
+                // Draw notifications on top
+                ui::notifications::draw(f, &app, f.area());
+            })?;
         }
 
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 let mut app_lock = app.lock().await;
                 
-                let should_send = if app_lock.mode == app::AppMode::Input 
+                let should_send = if app_lock.mode == AppMode::Input 
                     && app_lock.config.keybinds.send_message.matches(key.code, key.modifiers) {
                     true
                 } else {
@@ -306,4 +330,3 @@ async fn run_app(
         }
     }
 }
-

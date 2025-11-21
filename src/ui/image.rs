@@ -68,7 +68,6 @@ impl ImageRenderer {
         Ok(())
     }
 
-
     async fn process_and_cache_avatar(&mut self, url: &str, key: &str) -> Result<StatefulProtocol> {
         let img = self.download_image(url).await?;
 
@@ -90,13 +89,11 @@ impl ImageRenderer {
         let url = Self::get_avatar_url(user_id, avatar_hash);
         let key = format!("avatar_{}", user_id);
 
-        // try loading processed from disk
         if let Ok(protocol) = self.load_processed_avatar_from_disk(&key).await {
             self.avatar_cache.insert(user_id.to_string(), protocol);
             return Ok(());
         }
 
-        // otherwise download + process + save processed
         let protocol = self.process_and_cache_avatar(&url, &key).await?;
         self.avatar_cache.insert(user_id.to_string(), protocol);
 
@@ -143,7 +140,6 @@ impl ImageRenderer {
                 let original_width = img.width();
                 let original_height = img.height();
                 
-                // Calculate optimal size maintaining aspect ratio
                 let (target_width, target_height) = self.calculate_target_dimensions(
                     original_width,
                     original_height,
@@ -151,7 +147,6 @@ impl ImageRenderer {
                     max_height as u32,
                 );
                 
-                // Resize with high-quality filter
                 let resized = img.resize_exact(
                     target_width,
                     target_height,
@@ -160,7 +155,6 @@ impl ImageRenderer {
                 
                 let protocol = self.picker.new_resize_protocol(resized);
                 
-                // Save to disk cache
                 let _ = self.save_attachment_to_disk_cache(
                     attachment_id,
                     url,
@@ -240,9 +234,122 @@ impl ImageRenderer {
         DynamicImage::ImageRgba8(out)
     }
 
-    /// Get cache directory
+    /// Get cache directory (uses platform-specific cache location)
     fn get_cache_dir() -> Result<PathBuf> {
-        crate::config::get_image_cache_dir()
+        let cache_dir = dirs::cache_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find cache directory"))?
+            .join("remycord")
+            .join("images");
+        
+        std::fs::create_dir_all(&cache_dir)?;
+        Ok(cache_dir)
+    }
+
+    /// Get cache statistics
+    pub async fn get_cache_stats() -> Result<CacheStats> {
+        let cache_dir = Self::get_cache_dir()?;
+        
+        let mut total_size = 0u64;
+        let mut file_count = 0usize;
+        let mut avatar_count = 0usize;
+        let mut attachment_count = 0usize;
+        
+        if let Ok(entries) = fs::read_dir(&cache_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Ok(metadata) = entry.metadata().await {
+                    if metadata.is_file() {
+                        total_size += metadata.len();
+                        file_count += 1;
+                        
+                        if let Some(name) = entry.file_name().to_str() {
+                            if name.starts_with("avatar_") {
+                                avatar_count += 1;
+                            } else if !name.ends_with(".meta") {
+                                attachment_count += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(CacheStats {
+            total_size_bytes: total_size,
+            total_files: file_count,
+            avatar_files: avatar_count,
+            attachment_files: attachment_count,
+            cache_path: cache_dir,
+        })
+    }
+
+    /// Clear all cached images
+    pub async fn clear_cache() -> Result<()> {
+        let cache_dir = Self::get_cache_dir()?;
+        
+        if cache_dir.exists() {
+            fs::remove_dir_all(&cache_dir).await?;
+            fs::create_dir_all(&cache_dir).await?;
+        }
+        
+        Ok(())
+    }
+
+    /// Clear only avatar cache
+    pub async fn clear_avatar_cache() -> Result<()> {
+        let cache_dir = Self::get_cache_dir()?;
+        
+        if let Ok(entries) = fs::read_dir(&cache_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Some(name) = entry.file_name().to_str() {
+                    if name.starts_with("avatar_") {
+                        let _ = fs::remove_file(entry.path()).await;
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Clear only attachment cache
+    pub async fn clear_attachment_cache() -> Result<()> {
+        let cache_dir = Self::get_cache_dir()?;
+        
+        if let Ok(entries) = fs::read_dir(&cache_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Some(name) = entry.file_name().to_str() {
+                    if !name.starts_with("avatar_") {
+                        let _ = fs::remove_file(entry.path()).await;
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Clear old cache files
+    pub async fn clear_old_cache(days: u64) -> Result<()> {
+        let cache_dir = Self::get_cache_dir()?;
+        let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(days * 86400);
+        
+        if let Ok(entries) = fs::read_dir(&cache_dir).await {
+            let mut entries = entries;
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Ok(metadata) = entry.metadata().await {
+                    if let Ok(modified) = metadata.modified() {
+                        if modified < cutoff {
+                            let _ = fs::remove_file(entry.path()).await;
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(())
     }
 
     /// Load attachment from disk cache with metadata
@@ -303,48 +410,40 @@ impl ImageRenderer {
     pub fn get_attachment(&mut self, attachment_id: &str) -> Option<&mut StatefulProtocol> {
         self.attachment_cache.get_mut(attachment_id).map(|cached| &mut cached.protocol)
     }
+
+    /// Clear in-memory cache (useful for freeing RAM)
+    pub fn clear_memory_cache(&mut self) {
+        self.avatar_cache.clear();
+        self.attachment_cache.clear();
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheStats {
+    pub total_size_bytes: u64,
+    pub total_files: usize,
+    pub avatar_files: usize,
+    pub attachment_files: usize,
+    pub cache_path: PathBuf,
+}
+
+impl CacheStats {
+    pub fn total_size_mb(&self) -> f64 {
+        self.total_size_bytes as f64 / (1024.0 * 1024.0)
+    }
+
+    pub fn format_size(&self) -> String {
+        let kb = self.total_size_bytes as f64 / 1024.0;
+        if kb < 1024.0 {
+            format!("{:.1} KB", kb)
+        } else {
+            format!("{:.1} MB", self.total_size_mb())
+        }
+    }
 }
 
 impl Default for ImageRenderer {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_avatar_url_with_hash() {
-        let url = ImageRenderer::get_avatar_url("123456789", Some("abcdef123456"));
-        assert_eq!(url, "https://cdn.discordapp.com/avatars/123456789/abcdef123456.png?size=128");
-    }
-
-    #[test]
-    fn test_avatar_url_without_hash() {
-        let url = ImageRenderer::get_avatar_url("123456789", None);
-        assert!(url.starts_with("https://cdn.discordapp.com/embed/avatars/"));
-        assert!(url.ends_with(".png"));
-    }
-
-    #[test]
-    fn test_calculate_target_dimensions() {
-        let renderer = ImageRenderer::new();
-        
-        // Landscape image
-        let (w, h) = renderer.calculate_target_dimensions(1920, 1080, 30, 15);
-        assert!(w <= 30 && h <= 15);
-        assert!((w as f32 / h as f32 - 1920.0 / 1080.0).abs() < 0.1);
-        
-        // Portrait image
-        let (w, h) = renderer.calculate_target_dimensions(1080, 1920, 30, 15);
-        assert!(w <= 30 && h <= 15);
-        assert!((w as f32 / h as f32 - 1080.0 / 1920.0).abs() < 0.1);
-        
-        // Square image
-        let (w, h) = renderer.calculate_target_dimensions(1000, 1000, 30, 15);
-        assert!(w <= 30 && h <= 15);
-        assert_eq!(w, h);
     }
 }

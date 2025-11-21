@@ -1,7 +1,7 @@
 use crate::app::App;
 use crate::models::NotificationKind;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -15,7 +15,7 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
 
     let theme = app.theme();
     
-    let notification_width = 40.min(area.width / 3);
+    let notification_width = 50.min(area.width / 3);
     let notification_height = 3;
     
     for (i, notification) in app.notifications.iter().enumerate().take(5) {
