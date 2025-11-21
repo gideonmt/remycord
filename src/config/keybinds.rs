@@ -89,14 +89,8 @@ impl KeyBind {
         let needs_alt = self.modifiers.contains(&"Alt".to_string());
         let needs_shift = self.modifiers.contains(&"Shift".to_string());
 
-        has_ctrl == needs_ctrl && has_alt == needs_alt && has_shift == needs_shift;
-
         let matches = has_ctrl == needs_ctrl && has_alt == needs_alt && has_shift == needs_shift;
         
-        // DEBUG OUTPUT
-        eprintln!("KeyBind check: key='{}' expected='{}' key_matches={} has_ctrl={} needs_ctrl={} result={}",
-            format!("{:?}", code), self.key, key_matches, has_ctrl, needs_ctrl, matches);
-
         matches
     }
 }

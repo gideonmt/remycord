@@ -6,7 +6,7 @@ pub use mode::AppMode;
 pub use sidebar::SidebarItem;
 
 use crate::config::{Config, Theme, load_theme, CacheAutoClear};
-use crate::models::{Guild, Channel, Message, AttachedFile, DmChannel, Notification, ChannelList, ChannelCategory};
+use crate::models::{Guild, Message, AttachedFile, DmChannel, Notification, ChannelList};
 use crate::discord::DiscordClient;
 use crate::ui::image::{ImageRenderer, CacheStats};
 use std::collections::HashMap;
