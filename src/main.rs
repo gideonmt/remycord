@@ -151,14 +151,12 @@ async fn run_app(
         {
             let mut app = app.lock().await;
             
-            // Check cache health periodically
             if cache_check_timer.elapsed() >= cache_check_interval {
                 app.check_cache_health().await;
                 app.check_scheduled_cache_clear().await;
                 cache_check_timer = tokio::time::Instant::now();
             }
             
-            // Update cache stats periodically
             if cache_stats_timer.elapsed() >= cache_stats_interval {
                 if matches!(app.mode, AppMode::Settings | AppMode::KeybindRecording(_)) {
                     app.update_cache_stats().await;

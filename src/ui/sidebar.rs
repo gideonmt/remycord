@@ -59,17 +59,17 @@ pub fn draw(f: &mut Frame, app: &App, area: Rect) {
             
             let is_category = matches!(item, SidebarItem::Category { .. });
 
-            let style = if is_section {
+            let style = if is_section && is_selected {
                 Style::default()
                     .fg(theme.get_color("base0D"))
-                    .add_modifier(Modifier::BOLD)
-            } else if is_category {
-                Style::default()
-                    .fg(theme.get_color("base04"))
                     .add_modifier(Modifier::BOLD)
             } else if is_selected && app.mode == AppMode::Sidebar {
                 Style::default()
                     .fg(theme.get_color("base0A"))
+                    .add_modifier(Modifier::BOLD)
+            } else if is_category {
+                Style::default()
+                    .fg(theme.get_color("base04"))
                     .add_modifier(Modifier::BOLD)
             } else if is_active {
                 Style::default()
