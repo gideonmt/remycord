@@ -178,12 +178,6 @@ pub fn get_themes_dir() -> Result<PathBuf> {
     Ok(themes_dir)
 }
 
-pub fn get_image_cache_dir() -> Result<PathBuf> {
-    let cache_dir = get_config_dir()?.join("image_cache");
-    fs::create_dir_all(&cache_dir)?;
-    Ok(cache_dir)
-}
-
 pub fn load_config() -> Result<Config> {
     let config_path = get_config_path()?;
 
