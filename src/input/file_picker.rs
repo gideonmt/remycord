@@ -21,55 +21,78 @@ pub fn pick_file(
         LeaveAlternateScreen,
         DisableMouseCapture
     )?;
+    terminal.show_cursor()?;
     
-    if let Ok(file_path) = get_file_path(&app.config.general.file_manager) {
-        if !file_path.is_empty() {
-            app.attached_files.push(AttachedFile::new(file_path));
-        }
-    }
+    let file_path_result = get_file_path(&app.config.general.file_manager);
     
-    enable_raw_mode()?;
+    terminal.hide_cursor()?;
     execute!(
         terminal.backend_mut(),
         EnterAlternateScreen,
         EnableMouseCapture
     )?;
+    enable_raw_mode()?;
+    
+    terminal.clear()?;
+    
+    if let Ok(file_path) = file_path_result {
+        if !file_path.is_empty() {
+            app.attached_files.push(AttachedFile::new(file_path));
+        }
+    }
     
     Ok(())
 }
 
 fn get_file_path(file_manager: &str) -> Result<String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+    
     if file_manager == "lf" {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg("lf -selection-path=/tmp/lf_selection && cat /tmp/lf_selection 2>/dev/null")
-            .output()?;
+        let selection_path = "/tmp/lf_selection";
         
-        Ok(if output.status.success() {
-            String::from_utf8_lossy(&output.stdout).trim().to_string()
-        } else {
-            String::new()
-        })
+        let _ = std::fs::remove_file(selection_path);
+        
+        let status = Command::new("lf")
+            .arg("-selection-path")
+            .arg(selection_path)
+            .current_dir(&home_dir)
+            .status()?;
+        
+        if status.success() {
+            if let Ok(contents) = std::fs::read_to_string(selection_path) {
+                let _ = std::fs::remove_file(selection_path);
+                return Ok(contents.trim().to_string());
+            }
+        }
+        
+        Ok(String::new())
     } else {
-        let output = Command::new("find")
-            .arg(".")
+        let find_process = Command::new("find")
+            .arg(&home_dir)
             .arg("-type")
             .arg("f")
+            .arg("-not")
+            .arg("-path")
+            .arg("*/.*")
             .stdout(std::process::Stdio::piped())
-            .spawn()?
-            .stdout
+            .spawn()?;
+        
+        let find_stdout = find_process.stdout
             .ok_or_else(|| anyhow::anyhow!("Failed to capture find output"))?;
         
         let fzf_output = Command::new("fzf")
             .arg("--height=40%")
             .arg("--reverse")
-            .stdin(output)
+            .arg("--prompt=Select file: ")
+            .arg("--preview=head -n 20 {}")
+            .stdin(find_stdout)
             .output()?;
         
-        Ok(if fzf_output.status.success() {
-            String::from_utf8_lossy(&fzf_output.stdout).trim().to_string()
+        if fzf_output.status.success() {
+            Ok(String::from_utf8_lossy(&fzf_output.stdout).trim().to_string())
         } else {
-            String::new()
-        })
+            Ok(String::new())
+        }
     }
 }

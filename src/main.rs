@@ -325,19 +325,48 @@ async fn run_app(
                 if should_send {
                     let channel_id = app_lock.selected_channel.clone();
                     let content = app_lock.input.clone();
+                    let file_paths: Vec<String> = app_lock.attached_files
+                        .iter()
+                        .map(|f| f.path.clone())
+                        .collect();
                     
-                    if !content.is_empty() {
+                    let has_files = !file_paths.is_empty();
+                    let has_content = !content.is_empty();
+                    
+                    if has_content || has_files {
                         if let Some(channel_id) = channel_id {
                             let client_arc = app_lock.discord_client.clone();
                             if let Some(client_arc) = client_arc {
                                 let client = client_arc.lock().await;
-                                let _ = client.send_message(&channel_id, &content).await;
-                                drop(client);
+                                
+                                let result = if has_files {
+                                    client.send_message_with_files(&channel_id, &content, &file_paths).await
+                                } else {
+                                    client.send_message(&channel_id, &content).await
+                                };
+                                
+                                match result {
+                                    Ok(_) => {
+                                        drop(client);
+                                        if has_files {
+                                            app_lock.add_notification(Notification::success(
+                                                format!("Sent message with {} file(s)", file_paths.len())
+                                            ));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        drop(client);
+                                        app_lock.add_notification(Notification::error(
+                                            format!("Failed to send message: {}", e)
+                                        ));
+                                    }
+                                }
                             }
                         }
                         
                         app_lock.input.clear();
                         app_lock.input_cursor = 0;
+                        app_lock.attached_files.clear();
                     }
                 }
                 

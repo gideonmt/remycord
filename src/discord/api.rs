@@ -229,6 +229,66 @@ impl DiscordClient {
             timestamp,
         ))
     }
+    
+    pub async fn send_message_with_files(
+        &self,
+        channel_id: &str,
+        content: &str,
+        file_paths: &[String],
+    ) -> Result<AppMessage> {
+        use serenity::builder::{CreateAttachment, CreateMessage};
+        
+        let channel_id = channel_id.parse::<ChannelId>()?;
+        
+        let mut attachments = Vec::new();
+        for path in file_paths {
+            let file_data = tokio::fs::read(path).await?;
+            let filename = std::path::Path::new(path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file")
+                .to_string();
+            
+            attachments.push(CreateAttachment::bytes(file_data, filename));
+        }
+        
+        let mut builder = CreateMessage::new();
+        
+        if !content.is_empty() {
+            builder = builder.content(content);
+        }
+        
+        for attachment in attachments {
+            builder = builder.add_file(attachment);
+        }
+        
+        let message = channel_id.send_message(&self.http, builder).await?;
+        
+        let timestamp = message.timestamp.format("%H:%M:%S").to_string();
+        
+        let attachments: Vec<AppAttachment> = message.attachments
+            .into_iter()
+            .map(|a| AppAttachment::new(
+                a.id.to_string(),
+                a.filename,
+                a.url,
+                a.proxy_url,
+                a.width,
+                a.height,
+                a.content_type,
+            ))
+            .collect();
+        
+        Ok(AppMessage::new(
+            message.id.to_string(),
+            channel_id.to_string(),
+            message.author.name,
+            message.author.id.to_string(),
+            message.author.avatar.map(|h| h.to_string()),
+            message.content,
+            timestamp,
+        ).with_attachments(attachments))
+    }
 }
 
 struct Handler {
