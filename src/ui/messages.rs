@@ -7,6 +7,7 @@ use ratatui::{
     Frame,
 };
 use ratatui_image::StatefulImage;
+use image::GenericImageView;
 
 // Minimum height for each message row (includes header + at least 1 line of space)
 const MIN_MESSAGE_HEIGHT: u16 = 3;
@@ -89,45 +90,29 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         let content_lines = if msg.content.is_empty() { 0 } else { msg.content.lines().count() };
         let header_height = 1;
         let content_height = if content_lines > 0 { content_lines + 1 } else { 0 };
-        let attachment_text_height = if !msg.attachments.is_empty() { 1 + msg.attachments.len() } else { 0 };
-        let text_total_height = header_height + content_height + attachment_text_height;
-
-        let has_images = show_attachments && msg.has_images();
-        let image_attachments: Vec<_> = if has_images {
-            msg.attachments.iter().filter(|a| a.is_image()).collect()
-        } else {
-            Vec::new()
-        };
-
-        let image_height = if show_attachments && !image_attachments.is_empty() {
-            let min_img_width = app.config.images.min_image_width;
-            let max_img_width = app.config.images.max_image_width;
-            let max_img_height = app.config.images.max_image_height;
-            
-            let mut total_height = 0;
-            for attachment in image_attachments.iter() {
-                if let Some((orig_width, orig_height)) = app.image_renderer.get_attachment_dimensions(&attachment.id) {
-                    let aspect_ratio = orig_width as f32 / orig_height as f32;
-                    
-                    let target_width = if orig_width < min_img_width as u32 {
-                        min_img_width
-                    } else if orig_width > max_img_width as u32 {
-                        max_img_width
+        
+        let mut attachment_text_height = 0;
+        let mut image_height = 0;
+        
+        if !msg.attachments.is_empty() {
+            for attachment in msg.attachments.iter() {
+                if attachment.is_image() {
+                    if show_attachments {
+                        attachment_text_height += 1;
+                        if let Some(height) = app.image_renderer.get_attachment_height(&attachment.id) {
+                            image_height += height as usize;
+                        }
                     } else {
-                        orig_width as u16
-                    };
-                    
-                    let calculated_height = (target_width as f32 / aspect_ratio) as u16;
-                    let target_height = calculated_height.min(max_img_height);
-                    
-                    total_height += target_height as usize + 1;
+                        attachment_text_height += 1;
+                    }
+                } else {
+                    attachment_text_height += 1;
                 }
             }
-            total_height
-        } else {
-            0
-        };
-
+            attachment_text_height += 1;
+        }
+        
+        let text_total_height = header_height + content_height + attachment_text_height;
         let calculated_height = text_total_height + image_height;
         let total_height = calculated_height.max(MIN_MESSAGE_HEIGHT as usize);
         let remaining_height = messages_inner.bottom().saturating_sub(current_y);
@@ -189,30 +174,6 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
             message_lines.push(Line::from(""));
         }
 
-        if !msg.attachments.is_empty() {
-            for attachment in msg.attachments.iter() {
-                if attachment.is_image() {
-                    if show_attachments {
-                        message_lines.push(Line::from(vec![
-                            Span::styled("i  ", Style::default().fg(attachment_color)),
-                            Span::styled(&attachment.filename, Style::default().fg(attachment_color)),
-                        ]));
-                    } else {
-                        message_lines.push(Line::from(Span::styled(
-                            format!("i  {} (images disabled)", attachment.filename),
-                            Style::default().fg(dim_color),
-                        )));
-                    }
-                } else {
-                    message_lines.push(Line::from(Span::styled(
-                        format!("f {}", attachment.filename),
-                        Style::default().fg(attachment_color),
-                    )));
-                }
-            }
-            message_lines.push(Line::from(""));
-        }
-
         let text_height = message_lines.len() as u16;
         let text_area = Rect {
             x: message_area.x,
@@ -224,48 +185,77 @@ fn draw_messages_area(f: &mut Frame, app: &mut App, area: Rect) {
         let message_para = Paragraph::new(message_lines).wrap(Wrap { trim: false });
         f.render_widget(message_para, text_area);
 
-        if show_attachments && !image_attachments.is_empty() {
-            let mut image_y = text_area.y + text_height;
-            let min_img_width = app.config.images.min_image_width;
-            let max_img_width = app.config.images.max_image_width;
-            let max_img_height = app.config.images.max_image_height;
+        let mut attachment_y = text_area.y + text_height;
 
-            for attachment in image_attachments.iter() {
-                if image_y >= message_area.bottom() {
+        if !msg.attachments.is_empty() {
+            for attachment in msg.attachments.iter() {
+                if attachment_y >= message_area.bottom() {
                     break;
                 }
 
-                let (orig_width, orig_height) = app.image_renderer
-                    .get_attachment_dimensions(&attachment.id)
-                    .unwrap_or((800, 600));
+                if attachment.is_image() {
+                    if show_attachments {
+                        let label_line = Line::from(vec![
+                            Span::styled("i  ", Style::default().fg(attachment_color)),
+                            Span::styled(&attachment.filename, Style::default().fg(attachment_color)),
+                        ]);
+                        let label_area = Rect {
+                            x: message_area.x,
+                            y: attachment_y,
+                            width: message_area.width,
+                            height: 1,
+                        };
+                        let label_para = Paragraph::new(label_line);
+                        f.render_widget(label_para, label_area);
+                        attachment_y += 1;
 
-                if let Some(protocol) = app.image_renderer.get_attachment(&attachment.id) {
-                    let aspect_ratio = orig_width as f32 / orig_height as f32;
-                    
-                    let target_width = if orig_width < min_img_width as u32 {
-                        min_img_width
-                    } else if orig_width > max_img_width as u32 {
-                        max_img_width
+                        let img_height = app.image_renderer.get_attachment_height(&attachment.id);
+                        let img_width = app.image_renderer.get_attachment_width(&attachment.id);
+                        
+                        if let (Some(img_height), Some(img_width)) = (img_height, img_width) {
+                            if let Some(mut protocol) = app.image_renderer.get_attachment(&attachment.id) {
+                                let img_area = Rect {
+                                    x: message_area.x,
+                                    y: attachment_y,
+                                    width: img_width,
+                                    height: img_height,
+                                };
+                                
+                                let image_widget = StatefulImage::default();
+                                f.render_stateful_widget(image_widget, img_area, &mut protocol);
+                                
+                                attachment_y += img_height;
+                            }
+                        }
                     } else {
-                        orig_width as u16
-                    };
-                    
-                    let calculated_height = (target_width as f32 / aspect_ratio) as u16;
-                    let target_height = calculated_height.min(max_img_height);
-                    
-                    let available_height = message_area.bottom().saturating_sub(image_y);
-                    let img_height = target_height.min(available_height);
-
-                    let image_area = Rect {
+                        let label_line = Line::from(Span::styled(
+                            format!("i  {} (images disabled)", attachment.filename),
+                            Style::default().fg(dim_color),
+                        ));
+                        let label_area = Rect {
+                            x: message_area.x,
+                            y: attachment_y,
+                            width: message_area.width,
+                            height: 1,
+                        };
+                        let label_para = Paragraph::new(label_line);
+                        f.render_widget(label_para, label_area);
+                        attachment_y += 1;
+                    }
+                } else {
+                    let label_line = Line::from(Span::styled(
+                        format!("f {}", attachment.filename),
+                        Style::default().fg(attachment_color),
+                    ));
+                    let label_area = Rect {
                         x: message_area.x,
-                        y: image_y,
-                        width: target_width,
-                        height: img_height,
+                        y: attachment_y,
+                        width: message_area.width,
+                        height: 1,
                     };
-                    
-                    let image_widget = StatefulImage::default();
-                    f.render_stateful_widget(image_widget, image_area, protocol);
-                    image_y += img_height + 1;
+                    let label_para = Paragraph::new(label_line);
+                    f.render_widget(label_para, label_area);
+                    attachment_y += 1;
                 }
             }
         }

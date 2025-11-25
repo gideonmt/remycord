@@ -109,6 +109,15 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
         }
         DiscordEvent::NewMessage(msg) => {
             if Some(&msg.channel_id) == app.selected_channel.as_ref() {
+                let min = (
+                    app.config.images.min_image_width as u32,
+                    app.config.images.min_image_height as u32,
+                );
+                let max = (
+                    app.config.images.max_image_width as u32,
+                    app.config.images.max_image_height as u32,
+                );
+
                 if app.config.images.enabled && app.config.images.render_avatars {
                     let _ = app.image_renderer.load_avatar(
                         &msg.author_id,
@@ -121,6 +130,8 @@ async fn handle_discord_event(app: &mut App, event: DiscordEvent) {
                         let _ = app.image_renderer.load_attachment(
                             &attachment.id,
                             &attachment.url,
+                            min,
+                            max,
                         ).await;
                     }
                 }
@@ -246,6 +257,15 @@ async fn run_app(
                                     
                                     app.messages = messages.clone();
                                     
+                                    let min = (
+                                        app.config.images.min_image_width as u32,
+                                        app.config.images.min_image_height as u32,
+                                    );
+                                    let max = (
+                                        app.config.images.max_image_width as u32,
+                                        app.config.images.max_image_height as u32,
+                                    );
+                                    
                                     if app.config.images.enabled && app.config.images.render_avatars {
                                         for msg in &messages {
                                             let user_id = &msg.author_id;
@@ -261,6 +281,8 @@ async fn run_app(
                                                     .load_attachment(
                                                         &attachment.id, 
                                                         &attachment.url,
+                                                        min,
+                                                        max,
                                                     )
                                                     .await;
                                             }

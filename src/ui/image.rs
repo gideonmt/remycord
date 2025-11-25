@@ -8,14 +8,20 @@ use tokio::fs;
 
 pub struct ImageRenderer {
     picker: Picker,
-    avatar_cache: HashMap<String, StatefulProtocol>,
+    avatar_cache: HashMap<String, CachedAvatar>,
     attachment_cache: HashMap<String, CachedAttachment>,
 }
 
-struct CachedAttachment {
+struct CachedAvatar {
+    image: DynamicImage,
     protocol: StatefulProtocol,
-    original_width: u32,
-    original_height: u32,
+}
+
+struct CachedAttachment {
+    image: DynamicImage,
+    protocol: StatefulProtocol,
+    terminal_width: u16,
+    terminal_height: u16,
 }
 
 impl ImageRenderer {
@@ -66,12 +72,13 @@ impl ImageRenderer {
         Ok(())
     }
 
-    async fn process_and_cache_avatar(&mut self, url: &str, key: &str) -> Result<StatefulProtocol> {
+    async fn process_and_cache_avatar(&mut self, url: &str, key: &str) -> Result<(DynamicImage, StatefulProtocol)> {
         let img = self.download_image(url).await?;
         let resized = img.resize_exact(128, 128, FilterType::Lanczos3);
         let masked = Self::circle_mask(resized);
         self.save_processed_avatar_to_disk(key, &masked).await?;
-        Ok(self.picker.new_resize_protocol(masked))
+        let protocol = self.picker.new_resize_protocol(masked.clone());
+        Ok((masked, protocol))
     }
 
     pub async fn load_avatar(&mut self, user_id: &str, avatar_hash: Option<&str>) -> Result<()> {
@@ -82,18 +89,19 @@ impl ImageRenderer {
         let url = Self::get_avatar_url(user_id, avatar_hash);
         let key = format!("avatar_{}", user_id);
 
-        if let Ok(protocol) = self.load_processed_avatar_from_disk(&key).await {
-            self.avatar_cache.insert(user_id.to_string(), protocol);
-            return Ok(());
-        }
+        let (image, protocol) = if let Ok(img) = self.load_processed_avatar_from_disk(&key).await {
+            let protocol = self.picker.new_resize_protocol(img.clone());
+            (img, protocol)
+        } else {
+            self.process_and_cache_avatar(&url, &key).await?
+        };
 
-        let protocol = self.process_and_cache_avatar(&url, &key).await?;
-        self.avatar_cache.insert(user_id.to_string(), protocol);
+        self.avatar_cache.insert(user_id.to_string(), CachedAvatar { image, protocol });
 
         Ok(())
     }
 
-    async fn load_processed_avatar_from_disk(&mut self, key: &str) -> Result<StatefulProtocol> {
+    async fn load_processed_avatar_from_disk(&mut self, key: &str) -> Result<DynamicImage> {
         let dir = Self::get_cache_dir()?;
         let path = dir.join(format!("{}.png", key));
         if !path.exists() {
@@ -101,41 +109,77 @@ impl ImageRenderer {
         }
         let bytes = fs::read(&path).await?;
         let img = image::load_from_memory(&bytes)?;
-        Ok(self.picker.new_resize_protocol(img))
+        Ok(img)
     }
 
     pub async fn load_attachment(
         &mut self,
         attachment_id: &str,
         url: &str,
+        min_size: (u32, u32),
+        max_size: (u32, u32),
     ) -> Result<()> {
         if self.attachment_cache.contains_key(attachment_id) {
             return Ok(());
         }
 
-        if let Ok((protocol, width, height)) = self.load_attachment_from_disk_cache(attachment_id).await {
-            self.attachment_cache.insert(attachment_id.to_string(), CachedAttachment {
-                protocol,
-                original_width: width,
-                original_height: height,
-            });
-            return Ok(());
-        }
-
-        let img = self.download_image(url).await?;
-        let original_width = img.width();
-        let original_height = img.height();
-
-        let protocol = self.picker.new_resize_protocol(img);
-        let _ = self.save_attachment_to_disk_cache(attachment_id, url, original_width, original_height).await;
-
-        self.attachment_cache.insert(attachment_id.to_string(), CachedAttachment {
-            protocol,
-            original_width,
-            original_height,
-        });
+        let (image, terminal_width, terminal_height) = if let Ok(result) = self.load_attachment_from_disk_cache(attachment_id, min_size, max_size).await {
+            result
+        } else {
+            let img = self.download_image(url).await?;
+            let (resized_img, terminal_width, terminal_height) = self.resize_attachment_image(img, min_size, max_size);
+            let _ = self.save_attachment_to_disk_cache(attachment_id, &resized_img).await;
+            (resized_img, terminal_width, terminal_height)
+        };
+        
+        let protocol = self.picker.new_resize_protocol(image.clone());
+        
+        self.attachment_cache.insert(
+            attachment_id.to_string(),
+            CachedAttachment { image, protocol, terminal_width, terminal_height }
+        );
 
         Ok(())
+    }
+
+    fn resize_attachment_image(
+        &self,
+        img: DynamicImage,
+        min_size: (u32, u32),
+        max_size: (u32, u32),
+    ) -> (DynamicImage, u16, u16) {
+        let (width, height) = img.dimensions();
+        
+        let (font_w, font_h) = self.picker.font_size();
+        let min_w_px = min_size.0 * font_w as u32;
+        let min_h_px = min_size.1 * font_h as u32;
+        let max_w_px = max_size.0 * font_w as u32;
+        let max_h_px = max_size.1 * font_h as u32;
+
+        let (target_w, target_h) = if width < min_w_px || height < min_h_px {
+            let scale_w = min_w_px as f32 / width as f32;
+            let scale_h = min_h_px as f32 / height as f32;
+            let scale = scale_w.max(scale_h);
+            ((width as f32 * scale) as u32, (height as f32 * scale) as u32)
+        } else if width > max_w_px || height > max_h_px {
+            let scale_w = max_w_px as f32 / width as f32;
+            let scale_h = max_h_px as f32 / height as f32;
+            let scale = scale_w.min(scale_h);
+            ((width as f32 * scale) as u32, (height as f32 * scale) as u32)
+        } else {
+            (width, height)
+        };
+
+        let resized = if target_w != width || target_h != height {
+            img.resize_exact(target_w, target_h, FilterType::Lanczos3)
+        } else {
+            img
+        };
+
+        let terminal_width = ((target_w as f32 / font_w as f32).ceil() as u16).max(1);
+        let terminal_height = ((target_h as f32 / font_h as f32).ceil() as u16).max(1);
+
+        (resized, terminal_width, terminal_height)
     }
 
     async fn download_image(&self, url: &str) -> Result<DynamicImage> {
@@ -246,45 +290,56 @@ impl ImageRenderer {
         Ok(())
     }
 
-    async fn load_attachment_from_disk_cache(&mut self, key: &str) -> Result<(StatefulProtocol, u32, u32)> {
+    async fn load_attachment_from_disk_cache(
+        &mut self,
+        key: &str,
+        min_size: (u32, u32),
+        max_size: (u32, u32),
+    ) -> Result<(DynamicImage, u16, u16)> {
         let dir = Self::get_cache_dir()?;
         let img_path = dir.join(format!("{}.png", key));
-        let meta_path = dir.join(format!("{}.meta", key));
-        if img_path.exists() && meta_path.exists() {
+        if img_path.exists() {
             let bytes = fs::read(&img_path).await?;
-            let meta = fs::read_to_string(&meta_path).await?;
-            let dims: Vec<u32> = meta.split(',').filter_map(|s| s.parse().ok()).collect();
-            if dims.len() >= 2 {
-                let img = image::load_from_memory(&bytes)?;
-                let protocol = self.picker.new_resize_protocol(img);
-                return Ok((protocol, dims[0], dims[1]));
-            }
+            let img = image::load_from_memory(&bytes)?;
+            let (resized_img, terminal_width, terminal_height) = self.resize_attachment_image(img, min_size, max_size);
+            return Ok((resized_img, terminal_width, terminal_height));
         }
         Err(anyhow::anyhow!("Attachment cache not found"))
     }
 
-    async fn save_attachment_to_disk_cache(&self, key: &str, url: &str, width: u32, height: u32) -> Result<()> {
+    async fn save_attachment_to_disk_cache(&self, key: &str, img: &DynamicImage) -> Result<()> {
         let dir = Self::get_cache_dir()?;
         let img_path = dir.join(format!("{}.png", key));
-        let meta_path = dir.join(format!("{}.meta", key));
         if !img_path.exists() {
-            let bytes = reqwest::get(url).await?.bytes().await?;
-            fs::write(&img_path, &bytes).await?;
-            fs::write(&meta_path, format!("{},{}", width, height)).await?;
+            img.save(&img_path)?;
         }
         Ok(())
     }
 
     pub fn get_avatar(&mut self, user_id: &str) -> Option<&mut StatefulProtocol> {
-        self.avatar_cache.get_mut(user_id)
+        self.avatar_cache.get_mut(user_id).map(|c| &mut c.protocol)
     }
 
-    pub fn get_attachment(&mut self, attachment_id: &str) -> Option<&mut StatefulProtocol> {
-        self.attachment_cache.get_mut(attachment_id).map(|c| &mut c.protocol)
+    pub fn get_attachment(&mut self, attachment_id: &str) -> Option<StatefulProtocol> {
+        self.attachment_cache.get(attachment_id).map(|cached| {
+            self.picker.new_resize_protocol(cached.image.clone())
+        })
+    }
+    
+    pub fn get_avatar_image(&self, user_id: &str) -> Option<&DynamicImage> {
+        self.avatar_cache.get(user_id).map(|c| &c.image)
     }
 
-    pub fn get_attachment_dimensions(&self, attachment_id: &str) -> Option<(u32, u32)> {
-        self.attachment_cache.get(attachment_id).map(|c| (c.original_width, c.original_height))
+    pub fn get_attachment_image(&self, attachment_id: &str) -> Option<&DynamicImage> {
+        self.attachment_cache.get(attachment_id).map(|c| &c.image)
+    }
+
+    pub fn get_attachment_height(&self, attachment_id: &str) -> Option<u16> {
+        self.attachment_cache.get(attachment_id).map(|c| c.terminal_height)
+    }
+
+    pub fn get_attachment_width(&self, attachment_id: &str) -> Option<u16> {
+        self.attachment_cache.get(attachment_id).map(|c| c.terminal_width)
     }
 
     pub fn clear_memory_cache(&mut self) {

@@ -4,7 +4,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
 use crate::app::{App, AppMode, SidebarItem};
-use crate::config::{Keybinds, KeyBind, save_config, get_available_themes, CacheAutoClear};
+use crate::config::{Keybinds, KeyBind, save_config, get_available_themes};
 use crate::models::{Notification, ChannelType};
 use super::file_picker;
 
@@ -279,6 +279,16 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         18 => {
+            // Min image height
+            app.config.images.min_image_height = match app.config.images.min_image_height {
+                5 => 10,
+                10 => 15,
+                15 => 20,
+                20 => 25,
+                _ => 5,
+            };
+        }
+        19 => {
             // Max image width
             app.config.images.max_image_width = match app.config.images.max_image_width {
                 20 => 30,
@@ -288,7 +298,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
                 _ => 20,
             };
         }
-        19 => {
+        20 => {
             // Max image height
             app.config.images.max_image_height = match app.config.images.max_image_height {
                 5 => 10,
@@ -367,7 +377,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
 fn is_selectable_item(index: usize) -> bool {
     // Headers: 0, 9, 20, 33
     // Read-only: 1, 10, 21, 22, 23, 24, 29
-    !matches!(index, 0 | 8 | 9 | 10 | 20 | 21 | 22 | 23 | 24 | 29 | 33 | 34)
+    !matches!(index, 0 | 8 | 9 | 10 | 21 | 22 | 23 | 24 | 29 | 33 | 34)
 }
 
 fn cycle_theme(app: &mut App) -> Result<()> {
