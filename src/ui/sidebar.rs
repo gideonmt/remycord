@@ -6,14 +6,25 @@ use ratatui::{
     Frame,
 };
 
-pub fn draw(f: &mut Frame, app: &App, area: Rect) {
+pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
     let items = app.get_sidebar_items();
+
+    let visible_height = area.height.saturating_sub(2) as usize;
+    
+    app.sidebar_visible_items = visible_height;
+    
+    let start_idx = app.sidebar_scroll;
+    let end_idx = (start_idx + visible_height).min(items.len());
+    let items = &items[start_idx..end_idx];
+
     let theme = app.theme();
     
     let list_items: Vec<ListItem> = items
         .iter()
         .enumerate()
-        .map(|(i, item)| {
+        .map(|(visible_idx, item)| {
+            let i = start_idx + visible_idx;
+            
             let (text, indent_level) = match item {
                 SidebarItem::DmSection => {
                     let arrow = if app.dm_section_expanded { "▼ " } else { "▶ " };

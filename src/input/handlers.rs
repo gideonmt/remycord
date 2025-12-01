@@ -139,6 +139,7 @@ fn navigate_sidebar_down(app: &mut App) {
     let items = app.get_sidebar_items();
     if !items.is_empty() {
         app.selected_sidebar_idx = (app.selected_sidebar_idx + 1) % items.len();
+        adjust_sidebar_scroll(app, app.sidebar_visible_items);
     }
 }
 
@@ -150,6 +151,30 @@ fn navigate_sidebar_up(app: &mut App) {
         } else {
             app.selected_sidebar_idx = items.len() - 1;
         }
+        adjust_sidebar_scroll(app, app.sidebar_visible_items);
+    }
+}
+
+fn adjust_sidebar_scroll(app: &mut App, visible_items: usize) {
+    let items = app.get_sidebar_items();
+    let total_items = items.len();
+    
+    if visible_items >= total_items {
+        app.sidebar_scroll = 0;
+        return;
+    }
+    
+    if app.selected_sidebar_idx >= app.sidebar_scroll + visible_items {
+        app.sidebar_scroll = app.selected_sidebar_idx.saturating_sub(visible_items - 1);
+    }
+    
+    if app.selected_sidebar_idx < app.sidebar_scroll {
+        app.sidebar_scroll = app.selected_sidebar_idx;
+    }
+    
+    let max_scroll = total_items.saturating_sub(visible_items);
+    if app.sidebar_scroll > max_scroll {
+        app.sidebar_scroll = max_scroll;
     }
 }
 
@@ -270,7 +295,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
         15 => app.config.images.render_attachments = !app.config.images.render_attachments,
         16 => app.config.images.render_server_icons = !app.config.images.render_server_icons,
         17 => {
-            // Min image width
             app.config.images.min_image_width = match app.config.images.min_image_width {
                 10 => 20,
                 20 => 30,
@@ -279,7 +303,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         18 => {
-            // Min image height
             app.config.images.min_image_height = match app.config.images.min_image_height {
                 5 => 10,
                 10 => 15,
@@ -289,7 +312,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         19 => {
-            // Max image width
             app.config.images.max_image_width = match app.config.images.max_image_width {
                 20 => 30,
                 30 => 40,
@@ -299,7 +321,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         20 => {
-            // Max image height
             app.config.images.max_image_height = match app.config.images.max_image_height {
                 5 => 10,
                 10 => 15,
@@ -309,9 +330,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         
-        // Cache settings
         25 => {
-            // Max cache size
             app.config.images.max_cache_size_mb = match app.config.images.max_cache_size_mb {
                 50 => 100,
                 100 => 250,
@@ -321,7 +340,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         26 => {
-            // Warning threshold
             app.config.images.cache_warn_threshold_percent = match app.config.images.cache_warn_threshold_percent {
                 60 => 70,
                 70 => 80,
@@ -331,17 +349,13 @@ fn edit_setting(app: &mut App) -> Result<()> {
             };
         }
         27 => {
-            // Auto clear
             app.config.images.cache_auto_clear = app.config.images.cache_auto_clear.next();
         }
         28 => {
-            // Clear on exit
             app.config.images.cache_clear_on_exit = !app.config.images.cache_clear_on_exit;
         }
         
-        // Cache actions
         30 => {
-            // Clear all cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
                 let _ = ImageRenderer::clear_cache().await;
@@ -350,7 +364,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             app.add_notification(Notification::success("Cache cleared!"));
         }
         31 => {
-            // Clear avatar cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
                 let _ = ImageRenderer::clear_avatar_cache().await;
@@ -358,7 +371,6 @@ fn edit_setting(app: &mut App) -> Result<()> {
             app.add_notification(Notification::success("Avatar cache cleared!"));
         }
         32 => {
-            // Clear attachment cache
             tokio::spawn(async move {
                 use crate::ui::image::ImageRenderer;
                 let _ = ImageRenderer::clear_attachment_cache().await;
@@ -373,10 +385,7 @@ fn edit_setting(app: &mut App) -> Result<()> {
     Ok(())
 }
 
-
 fn is_selectable_item(index: usize) -> bool {
-    // Headers: 0, 9, 20, 33
-    // Read-only: 1, 10, 21, 22, 23, 24, 29
     !matches!(index, 0 | 8 | 9 | 10 | 21 | 22 | 23 | 24 | 29 | 33 | 34)
 }
 
