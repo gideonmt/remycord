@@ -42,11 +42,6 @@ impl Notification {
         Self::new(message, NotificationKind::Error)
     }
 
-    pub fn with_duration(mut self, duration: Duration) -> Self {
-        self.duration = duration;
-        self
-    }
-
     pub fn is_expired(&self) -> bool {
         self.created_at.elapsed() >= self.duration
     }

@@ -64,7 +64,7 @@ pub fn get_items(
             });
             
             if is_expanded {
-                for channel in channel_list.channels_in_category(&category.id) {
+                for channel in channel_list.text_channels(&category.id) {
                     items.push(SidebarItem::Channel {
                         guild_id: guild.id.clone(),
                         channel: channel.clone(),

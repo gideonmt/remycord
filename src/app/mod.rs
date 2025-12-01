@@ -90,17 +90,6 @@ impl App {
         }
     }
     
-    pub fn is_category_expanded(&self, guild_id: &str, category_id: &str) -> bool {
-        self.expanded_categories
-            .get(guild_id)
-            .map(|cats| cats.contains(category_id))
-            .unwrap_or(false)
-    }
-    
-    pub fn get_guild_channels(&self, guild_id: &str) -> Option<&ChannelList> {
-        self.channel_cache.get(guild_id)
-    }
-
     pub fn get_sidebar_items(&self) -> Vec<SidebarItem> {
         sidebar::get_items(
             &self.dms,

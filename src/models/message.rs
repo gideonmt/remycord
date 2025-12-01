@@ -47,10 +47,6 @@ impl Message {
         self.attachments = attachments;
         self
     }
-
-    pub fn has_images(&self) -> bool {
-        self.attachments.iter().any(|a| a.is_image())
-    }
 }
 
 impl MessageAttachment {

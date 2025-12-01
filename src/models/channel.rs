@@ -104,18 +104,10 @@ impl ChannelList {
     }
 
     /// Get channels in a specific category
-    pub fn channels_in_category(&self, category_id: &str) -> Vec<&Channel> {
+    pub fn text_channels(&self, category_id: &str) -> Vec<&Channel> {
         self.channels
             .iter()
             .filter(|c| c.parent_id.as_deref() == Some(category_id))
-            .collect()
-    }
-
-    /// Get all text-based channels (for message viewing)
-    pub fn text_channels(&self) -> Vec<&Channel> {
-        self.channels
-            .iter()
-            .filter(|c| c.is_text_based())
             .collect()
     }
 }

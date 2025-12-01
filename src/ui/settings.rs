@@ -1,5 +1,4 @@
 use crate::app::{App, AppMode};
-use crate::config::CacheAutoClear;
 use ratatui::{
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem},

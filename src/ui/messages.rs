@@ -7,7 +7,6 @@ use ratatui::{
     Frame,
 };
 use ratatui_image::StatefulImage;
-use image::GenericImageView;
 
 // Minimum height for each message row (includes header + at least 1 line of space)
 const MIN_MESSAGE_HEIGHT: u16 = 3;

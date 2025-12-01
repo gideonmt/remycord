@@ -326,14 +326,6 @@ impl ImageRenderer {
         })
     }
     
-    pub fn get_avatar_image(&self, user_id: &str) -> Option<&DynamicImage> {
-        self.avatar_cache.get(user_id).map(|c| &c.image)
-    }
-
-    pub fn get_attachment_image(&self, attachment_id: &str) -> Option<&DynamicImage> {
-        self.attachment_cache.get(attachment_id).map(|c| &c.image)
-    }
-
     pub fn get_attachment_height(&self, attachment_id: &str) -> Option<u16> {
         self.attachment_cache.get(attachment_id).map(|c| c.terminal_height)
     }
@@ -360,15 +352,6 @@ pub struct CacheStats {
 impl CacheStats {
     pub fn total_size_mb(&self) -> f64 {
         self.total_size_bytes as f64 / (1024.0 * 1024.0)
-    }
-
-    pub fn format_size(&self) -> String {
-        let kb = self.total_size_bytes as f64 / 1024.0;
-        if kb < 1024.0 {
-            format!("{:.1} KB", kb)
-        } else {
-            format!("{:.1} MB", self.total_size_mb())
-        }
     }
 }
 
